@@ -17,6 +17,7 @@
 #include <cereal/types/vector.hpp>
 
 #include <immer/algorithm.hpp>
+#include <immer/flex_vector.hpp>
 #include <immer/map.hpp>
 #include <immer/vector.hpp>
 
@@ -37,6 +38,68 @@ namespace {
 
 using example_vector = immer_archive::vector_one<int>;
 
+const auto gen = [](auto init, int count) {
+    for (int i = 0; i < count; ++i) {
+        init = std::move(init).push_back(i);
+    }
+    return init;
+};
+
+void test_vector()
+{
+    using immer_archive::save_vector;
+
+    {
+        // empty
+        const auto empty = example_vector{};
+        const auto one   = empty.push_back(123);
+        auto ar          = save_vector(empty, {});
+        ar               = save_vector(one, ar);
+        SPDLOG_DEBUG("archive = {}", to_json(ar));
+    }
+
+    const auto v65  = gen(example_vector{}, 67);
+    const auto v66  = v65.push_back(1337);
+    const auto v67  = v66.push_back(1338);
+    const auto v68  = v67.push_back(1339);
+    const auto v900 = gen(v68, 9999);
+
+    auto ar = save_vector(v65, {});
+    ar      = save_vector(v66, ar);
+    ar      = save_vector(v67, ar);
+    ar      = save_vector(v68, ar);
+    ar      = save_vector(v900, ar);
+
+    SPDLOG_DEBUG("archive = {}", to_json(ar));
+}
+
+void test_flex_vector()
+{
+    using immer_archive::save_vector;
+
+    {
+        // empty
+        const auto empty = immer_archive::flex_vector_one<int>{};
+        const auto one   = empty.push_back(123);
+        auto ar          = save_vector(empty, {});
+        ar               = save_vector(one, ar);
+        SPDLOG_DEBUG("empty and one archive = {}", to_json(ar));
+    }
+
+    const auto v1 = gen(immer_archive::flex_vector_one<int>{}, 3);
+    const auto v2 = gen(immer_archive::flex_vector_one<int>{}, 4);
+
+    const auto v3 = v1 + v2;
+
+    auto ar = save_vector(v1, {});
+    ar      = save_vector(v2, ar);
+    ar      = save_vector(v3, ar);
+
+    SPDLOG_DEBUG("archive = {}", to_json(ar));
+    SPDLOG_DEBUG("archive2 = {}", to_json(save_vector(v1, {})));
+    SPDLOG_DEBUG("archive2 = {}", to_json(save_vector(v3, {})));
+}
+
 } // namespace
 
 int main(int argc, const char* argv[])
@@ -47,30 +110,11 @@ int main(int argc, const char* argv[])
     //    auto v2  = vec.push_back(2);
     //    save_vector(v2);
 
-    const auto gen = [](auto init, int count) {
-        for (int i = 0; i < count; ++i) {
-            init = std::move(init).push_back(i);
-        }
-        return init;
-    };
-
-    const auto v65  = gen(example_vector{}, 67);
-    const auto v66  = v65.push_back(1337);
-    const auto v67  = v66.push_back(1338);
-    const auto v68  = v67.push_back(1339);
-    const auto v900 = gen(v68, 9999);
-
-    using immer_archive::save_vector;
-    auto ar = save_vector(v65, {});
-    ar      = save_vector(v66, ar);
-    ar      = save_vector(v67, ar);
-    ar      = save_vector(v68, ar);
-    ar      = save_vector(v900, ar);
-
-    SPDLOG_DEBUG("archive = {}", to_json(ar));
-
     // auto big_branches = gen(immer::vector<std::uint64_t>{}, 67);
     // traverse_nodes(big_branches.impl());
+
+    // test_vector();
+    test_flex_vector();
 
     return 0;
 }

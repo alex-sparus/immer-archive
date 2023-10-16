@@ -15,6 +15,11 @@ template <typename T,
           immer::detail::rbts::bits_t B = immer::default_bits>
 using vector_one = immer::vector<T, MemoryPolicy, B, 1>;
 
+template <typename T,
+          typename MemoryPolicy         = immer::default_memory_policy,
+          immer::detail::rbts::bits_t B = immer::default_bits>
+using flex_vector_one = immer::flex_vector<T, MemoryPolicy, B, 1>;
+
 using node_id = std::uint64_t;
 static_assert(sizeof(void*) == sizeof(node_id));
 
