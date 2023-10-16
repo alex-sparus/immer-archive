@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		FA4949C62AD6E8ED00C62D74 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA4949C52AD6E8ED00C62D74 /* main.cpp */; };
+		FA9ACE372AD9943B00D14FFB /* libspdlog.1.11.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = FA9ACE362AD9943B00D14FFB /* libspdlog.1.11.0.dylib */; };
+		FA9ACE392AD9944B00D14FFB /* libfmt.9.1.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = FA9ACE382AD9944B00D14FFB /* libfmt.9.1.0.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -26,6 +28,10 @@
 		FA4949C22AD6E8ED00C62D74 /* immer-test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "immer-test"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA4949C52AD6E8ED00C62D74 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		FA4949CC2AD6EAD000C62D74 /* immer */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = immer; sourceTree = "<group>"; };
+		FA9ACE362AD9943B00D14FFB /* libspdlog.1.11.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libspdlog.1.11.0.dylib; path = "../../../../../nix/store/aig3dvp5h3n91pqqgr84n894450bry3l-spdlog-1.11.0/lib/libspdlog.1.11.0.dylib"; sourceTree = "<group>"; };
+		FA9ACE382AD9944B00D14FFB /* libfmt.9.1.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libfmt.9.1.0.dylib; path = "../../../../../nix/store/yzghz81g1pm7qwhv5is9zybij0bmrazw-fmt-9.1.0/lib/libfmt.9.1.0.dylib"; sourceTree = "<group>"; };
+		FA9ACE3A2AD994B700D14FFB /* libfmt.9.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libfmt.9.dylib; path = "../../../../../nix/store/yzghz81g1pm7qwhv5is9zybij0bmrazw-fmt-9.1.0/lib/libfmt.9.dylib"; sourceTree = "<group>"; };
+		FA9ACE3C2AD994B900D14FFB /* libfmt.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libfmt.dylib; path = "../../../../../nix/store/yzghz81g1pm7qwhv5is9zybij0bmrazw-fmt-9.1.0/lib/libfmt.dylib"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,6 +39,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA9ACE392AD9944B00D14FFB /* libfmt.9.1.0.dylib in Frameworks */,
+				FA9ACE372AD9943B00D14FFB /* libspdlog.1.11.0.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -44,6 +52,7 @@
 			children = (
 				FA4949C42AD6E8ED00C62D74 /* immer-test */,
 				FA4949C32AD6E8ED00C62D74 /* Products */,
+				FA9ACE352AD9943B00D14FFB /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -62,6 +71,17 @@
 				FA4949CC2AD6EAD000C62D74 /* immer */,
 			);
 			path = "immer-test";
+			sourceTree = "<group>";
+		};
+		FA9ACE352AD9943B00D14FFB /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				FA9ACE3C2AD994B900D14FFB /* libfmt.dylib */,
+				FA9ACE3A2AD994B700D14FFB /* libfmt.9.dylib */,
+				FA9ACE382AD9944B00D14FFB /* libfmt.9.1.0.dylib */,
+				FA9ACE362AD9943B00D14FFB /* libspdlog.1.11.0.dylib */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -247,7 +267,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				"HEADER_SEARCH_PATHS[arch=*]" = "/Users/alex/sparus/xcode-immer/immer-test/immer-test/immer";
+				"HEADER_SEARCH_PATHS[arch=*]" = (
+					"/nix/store/vn1n14mdssg1776wxfbyhcgwrknzxamh-spdlog-1.11.0-dev/include",
+					"/nix/store/cdz0a74sy8zksq8swjzlsnr0km8f89y6-fmt-9.1.0-dev/include",
+					"/Users/alex/sparus/xcode-immer/immer-test/immer-test/immer",
+				);
+				PRELINK_LIBS = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -256,6 +281,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				PRELINK_LIBS = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

@@ -24,7 +24,7 @@
       '';
     in rec {
       devShell = pkgs.mkShell {
-        packages = with pkgs; [clang-format cmake ninja];
+        packages = with pkgs; [clang-format cmake ninja spdlog cereal fmt];
       };
     });
 }
