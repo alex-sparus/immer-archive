@@ -18,19 +18,20 @@ struct is_regular_pos_func
     }
 
     template <class... Rest>
-    constexpr bool operator()(immer::detail::rbts::full_pos<Rest...>&)
+    constexpr bool operator()(const immer::detail::rbts::full_pos<Rest...>&)
     {
         return true;
     }
 
     template <class... Rest>
-    constexpr bool operator()(immer::detail::rbts::regular_pos<Rest...>&)
+    constexpr bool operator()(const immer::detail::rbts::regular_pos<Rest...>&)
     {
         return true;
     }
 
     template <class... Rest>
-    constexpr bool operator()(immer::detail::rbts::empty_regular_pos<Rest...>&)
+    constexpr bool
+    operator()(const immer::detail::rbts::empty_regular_pos<Rest...>&)
     {
         return true;
     }
@@ -39,25 +40,27 @@ struct is_regular_pos_func
 struct is_leaf_pos_func
 {
     template <class... Rest>
-    constexpr bool operator()(immer::detail::rbts::leaf_sub_pos<Rest...>&)
+    constexpr bool operator()(const immer::detail::rbts::leaf_sub_pos<Rest...>&)
     {
         return true;
     }
 
     template <class... Rest>
-    constexpr bool operator()(immer::detail::rbts::full_leaf_pos<Rest...>&)
+    constexpr bool
+    operator()(const immer::detail::rbts::full_leaf_pos<Rest...>&)
     {
         return true;
     }
 
     template <class... Rest>
-    constexpr bool operator()(immer::detail::rbts::leaf_pos<Rest...>&)
+    constexpr bool operator()(const immer::detail::rbts::leaf_pos<Rest...>&)
     {
         return true;
     }
 
     template <class... Rest>
-    constexpr bool operator()(immer::detail::rbts::empty_leaf_pos<Rest...>&)
+    constexpr bool
+    operator()(const immer::detail::rbts::empty_leaf_pos<Rest...>&)
     {
         return true;
     }
