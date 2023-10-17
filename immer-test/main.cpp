@@ -5,9 +5,11 @@
 //  Created by Alex Shabalin on 11/10/2023.
 //
 
+#include <fstream>
 #include <iostream>
 
 #include "immer_save.hpp"
+#include "rbtree_builder.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -100,6 +102,28 @@ void test_flex_vector()
     SPDLOG_DEBUG("archive2 = {}", to_json(save_vector(v3, {})));
 }
 
+immer_archive::archive<int> load_archive(std::string_view filename)
+{
+    auto is = std::ifstream{filename};
+    if (!is) {
+        throw std::runtime_error{
+            fmt::format("Failed to read from {}", filename)};
+    }
+
+    auto result = immer_archive::archive<int>{};
+    {
+        auto ar = cereal::JSONInputArchive{is};
+        ar(result);
+    }
+    return result;
+}
+
+void test_read_vector()
+{
+    auto ar = load_archive("../immer-test/vec01.json");
+    SPDLOG_DEBUG("archive = {}", to_json(ar));
+}
+
 } // namespace
 
 int main(int argc, const char* argv[])
@@ -114,7 +138,8 @@ int main(int argc, const char* argv[])
     // traverse_nodes(big_branches.impl());
 
     // test_vector();
-    test_flex_vector();
+    // test_flex_vector();
+    test_read_vector();
 
     return 0;
 }

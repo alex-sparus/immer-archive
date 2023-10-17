@@ -1,5 +1,6 @@
 #pragma once
 
+#include <immer/array.hpp>
 #include <immer/map.hpp>
 #include <immer/vector.hpp>
 
@@ -28,6 +29,7 @@ struct leaf_node
 {
     const T* begin;
     const T* end;
+    immer::array<T> data; // NOTE: data is only used while reading the archive
 };
 
 struct inner_node
@@ -40,6 +42,7 @@ struct vector
     node_id root;
     node_id tail;
     std::size_t size;
+    immer::detail::rbts::shift_t shift;
 };
 
 template <class T>
@@ -54,26 +57,45 @@ struct archive
  * Serialization functions.
  */
 template <class Archive, class T>
-void serialize(Archive& ar, leaf_node<T>& value)
+void save(Archive& ar, const leaf_node<T>& value)
 {
     std::vector<T> dump{value.begin, value.end};
     ar(cereal::make_nvp("values", dump));
 }
 
+template <class Archive, class T>
+void load(Archive& archive, leaf_node<T>& m)
+{
+    auto vec = std::vector<T>{};
+    archive(vec);
+    m.data  = immer::array<T>{vec.begin(), vec.end()};
+    m.begin = m.data.begin();
+    m.end   = m.data.end();
+}
+
 template <class Archive>
-void serialize(Archive& ar, inner_node& value)
+void save(Archive& ar, const inner_node& value)
 {
     std::vector<node_id> dump{value.children.begin(), value.children.end()};
     ar(cereal::make_nvp("children", dump));
 }
 
 template <class Archive>
+void load(Archive& archive, inner_node& m)
+{
+    auto vec = std::vector<node_id>{};
+    archive(cereal::make_nvp("children", vec));
+    m.children = immer::vector<node_id>{vec.begin(), vec.end()};
+}
+
+template <class Archive>
 void serialize(Archive& ar, vector& value)
 {
-    auto& root = value.root;
-    auto& tail = value.tail;
-    auto& size = value.size;
-    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(size));
+    auto& root  = value.root;
+    auto& tail  = value.tail;
+    auto& size  = value.size;
+    auto& shift = value.shift;
+    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(size), CEREAL_NVP(shift));
 }
 
 template <class Archive, class T>

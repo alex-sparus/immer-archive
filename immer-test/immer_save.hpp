@@ -300,9 +300,10 @@ archive<T> save_vector(const vector_one<T>& vec, archive<T> archive)
     archive.vectors = std::move(archive.vectors)
                           .set(vector_id,
                                vector{
-                                   .root = root_id,
-                                   .tail = tail_id,
-                                   .size = impl.size,
+                                   .root  = root_id,
+                                   .tail  = tail_id,
+                                   .size  = impl.size,
+                                   .shift = impl.shift,
                                });
 
     return archive;
@@ -331,9 +332,10 @@ archive<T> save_vector(const flex_vector_one<T>& vec, archive<T> archive)
     archive.vectors = std::move(archive.vectors)
                           .set(vector_id,
                                vector{
-                                   .root = root_id,
-                                   .tail = tail_id,
-                                   .size = impl.size,
+                                   .root  = root_id,
+                                   .tail  = tail_id,
+                                   .size  = impl.size,
+                                   .shift = impl.shift,
                                });
 
     return archive;
