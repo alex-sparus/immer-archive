@@ -17,6 +17,11 @@ add_executable(MyExample main.cpp)
 target_include_directories(MyExample PRIVATE immer .)
 target_link_libraries(MyExample PRIVATE spdlog::spdlog)
 
+target_compile_options(MyExample INTERFACE
+    -fno-omit-frame-pointer -fsanitize-coverage=trace-pc-guard -fsanitize=address)
+target_compile_definitions(MyExample INTERFACE BOOST_USE_ASAN=1)
+target_link_options(MyExample INTERFACE -fsanitize=address)
+
 target_compile_options(MyExample PRIVATE
     $<$<CXX_COMPILER_ID:Clang>:-g>
     )

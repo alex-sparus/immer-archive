@@ -23,8 +23,8 @@
         ln -s ${pkgs.llvmPackages_16.clang-unwrapped}/bin/clang-format $out/bin/
       '';
     in rec {
-      devShell = pkgs.mkShell {
-        packages = with pkgs; [clang-format cmake ninja spdlog cereal fmt];
+      devShell = pkgs.mkShell.override {stdenv = pkgs.llvmPackages_14.stdenv;} {
+        packages = with pkgs; [clang-format cmake ninja spdlog cereal fmt_9];
       };
     });
 }

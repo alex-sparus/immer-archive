@@ -14,6 +14,7 @@
 #include <spdlog/spdlog.h>
 
 #include <bnz/immer_map.hpp>
+#include <bnz/immer_vector.hpp>
 #include <cereal/archives/json.hpp>
 #include <cereal/cereal.hpp>
 #include <cereal/types/vector.hpp>
@@ -24,6 +25,7 @@
 #include <immer/vector.hpp>
 
 namespace {
+
 template <typename T>
 std::string to_json(const T& serializable)
 {
@@ -34,6 +36,42 @@ std::string to_json(const T& serializable)
     }
     return os.str();
 }
+
+template <typename T>
+T from_json(std::string input)
+{
+    auto is = std::istringstream{input};
+    auto ar = cereal::JSONInputArchive{is};
+    auto r  = T{};
+    ar(r);
+    return r;
+}
+
+immer_archive::archive<int> load_archive(std::string_view filename)
+{
+    auto is = std::ifstream{filename};
+    if (!is) {
+        throw std::runtime_error{
+            fmt::format("Failed to read from {}", filename)};
+    }
+
+    auto result = immer_archive::archive<int>{};
+    {
+        auto ar = cereal::JSONInputArchive{is};
+        ar(result);
+    }
+    return result;
+}
+
+void save_to_file(std::string_view filename, std::string_view data)
+{
+    auto os = std::ofstream{filename};
+    if (!os) {
+        throw std::runtime_error{fmt::format("Failed to save to {}", filename)};
+    }
+    os.write(data.data(), data.size());
+}
+
 } // namespace
 
 namespace {
@@ -57,8 +95,27 @@ void test_vector()
         const auto one   = empty.push_back(123);
         auto ar          = save_vector(empty, {});
         ar               = save_vector(one, ar);
-        SPDLOG_DEBUG("archive = {}", to_json(ar));
+        save_to_file("vec01.json", to_json(ar));
     }
+
+    {
+        // 66 is the biggest vector with only one inner node
+        const auto vec = gen(example_vector{}, 66);
+        auto ar        = save_vector(vec, {});
+        save_to_file("vec66.json", to_json(ar));
+    }
+
+    // {
+    //     auto vec = example_vector{};
+    //     for (auto size = std::size_t{1}; size < 10000; ++size) {
+    //         vec     = std::move(vec).push_back(size);
+    //         auto ar = save_vector(vec, {});
+    //         if (ar.inners.size() >= 2) {
+    //             SPDLOG_DEBUG("size is {}, ar = {}", size, to_json(ar));
+    //             break;
+    //         }
+    //     }
+    // }
 
     const auto v65  = gen(example_vector{}, 67);
     const auto v66  = v65.push_back(1337);
@@ -71,8 +128,7 @@ void test_vector()
     ar      = save_vector(v67, ar);
     ar      = save_vector(v68, ar);
     ar      = save_vector(v900, ar);
-
-    SPDLOG_DEBUG("archive = {}", to_json(ar));
+    save_to_file("huge_vectors.json", to_json(ar));
 }
 
 void test_flex_vector()
@@ -102,26 +158,65 @@ void test_flex_vector()
     SPDLOG_DEBUG("archive2 = {}", to_json(save_vector(v3, {})));
 }
 
-immer_archive::archive<int> load_archive(std::string_view filename)
+void test_save_and_load()
 {
-    auto is = std::ifstream{filename};
-    if (!is) {
-        throw std::runtime_error{
-            fmt::format("Failed to read from {}", filename)};
-    }
+    auto test_vectors = std::vector<example_vector>{// gen(example_vector{}, 67)
+                                                    example_vector{}};
+    auto counter      = std::size_t{};
+    auto ar           = immer_archive::archive<int>{};
+    const auto save_and_load = [&]() {
+        auto vec = test_vectors.back().push_back(++counter);
+        test_vectors.push_back(vec);
+        ar           = immer_archive::save_vector(vec, ar);
+        auto ar_json = to_json(ar);
+        SPDLOG_DEBUG("ar = {}", ar_json);
 
-    auto result = immer_archive::archive<int>{};
-    {
-        auto ar = cereal::JSONInputArchive{is};
-        ar(result);
+        auto loader = immer_archive::loader<int>{
+            from_json<immer_archive::archive<int>>(ar_json)};
+        auto loaded_vec = loader.load_vector(ar.vectors.begin()->first);
+        assert(loaded_vec.has_value());
+        assert(*loaded_vec == vec);
+
+        // save it again, causing the full traversal and crash
+        // SPDLOG_DEBUG("size = {}", size);
+        // SPDLOG_DEBUG("vec = {}", to_json(loaded_vec.value()));
+        // auto ar2 = immer_archive::save_vector(loaded_vec.value(), {});
+        // SPDLOG_DEBUG("ar = {}, ar2 = {}", to_json(ar), to_json(ar2));
+    };
+    for (int i = 0; i < 10; ++i) {
+        save_and_load();
     }
-    return result;
 }
 
 void test_read_vector()
 {
-    auto ar = load_archive("../immer-test/vec01.json");
-    SPDLOG_DEBUG("archive = {}", to_json(ar));
+    const bool xcode = false;
+    const auto load  = [](auto name) {
+        SPDLOG_DEBUG("loading {}", name);
+        auto prefix =
+            (xcode ? std::string{"../"} : "") + "../immer-test/test/data/";
+        return load_archive(prefix + name);
+    };
+
+    const auto check_file = [&](auto name) {
+        auto ar     = load(name);
+        auto loader = immer_archive::loader<int>{ar};
+        for (const auto& [vector_id, vector_info] : ar.vectors) {
+            auto vec = loader.load_vector(vector_id);
+            assert(vec.value().impl().check_tree());
+
+            // Iterate over the whole read vector, just to test.
+            immer::vector<int> test;
+            for (int i : vec.value()) {
+                test = std::move(test).push_back(i);
+            }
+            SPDLOG_DEBUG("tested vector size {}", test.size());
+        }
+    };
+
+    check_file("vec66.json");
+    check_file("vec01.json");
+    check_file("huge_vectors.json");
 }
 
 } // namespace
@@ -139,6 +234,7 @@ int main(int argc, const char* argv[])
 
     // test_vector();
     // test_flex_vector();
+    // test_save_and_load();
     test_read_vector();
 
     return 0;

@@ -6,6 +6,8 @@
 
 #include <cereal/cereal.hpp>
 
+#include <bnz/immer_vector.hpp>
+
 namespace immer_archive {
 
 // Fixing BL to 1, because by default it depends on the sizeof(T)
@@ -53,39 +55,59 @@ struct archive
     immer::map<node_id, vector> vectors;
 };
 
+// This is needed to be able to use the archive that was not read from JSON
+// because .data is set only while reading from JSON.
+template <class T>
+archive<T> fix_leaf_nodes(archive<T> ar)
+{
+    auto leaves = immer::map<node_id, leaf_node<T>>{};
+    for (const auto& item : ar.leaves) {
+        auto data = immer::array<T>{item.second.begin, item.second.end};
+        auto leaf = leaf_node<T>{
+            .begin = data.begin(),
+            .end   = data.end(),
+            .data  = data,
+        };
+        leaves = std::move(leaves).set(item.first, leaf);
+    }
+    ar.leaves = std::move(leaves);
+    return ar;
+}
+
 /**
  * Serialization functions.
  */
 template <class Archive, class T>
 void save(Archive& ar, const leaf_node<T>& value)
 {
-    std::vector<T> dump{value.begin, value.end};
-    ar(cereal::make_nvp("values", dump));
+    ar(cereal::make_size_tag(
+        static_cast<cereal::size_type>(value.end - value.begin)));
+    for (auto p = value.begin; p != value.end; ++p) {
+        ar(*p);
+    }
 }
 
 template <class Archive, class T>
-void load(Archive& archive, leaf_node<T>& m)
+void load(Archive& ar, leaf_node<T>& m)
 {
-    auto vec = std::vector<T>{};
-    archive(vec);
-    m.data  = immer::array<T>{vec.begin(), vec.end()};
+    cereal::size_type size;
+    ar(cereal::make_size_tag(size));
+
+    for (auto i = cereal::size_type{}; i < size; ++i) {
+        T x;
+        ar(x);
+        m.data = std::move(m.data).push_back(std::move(x));
+    }
+
     m.begin = m.data.begin();
     m.end   = m.data.end();
 }
 
 template <class Archive>
-void save(Archive& ar, const inner_node& value)
+void serialize(Archive& ar, inner_node& value)
 {
-    std::vector<node_id> dump{value.children.begin(), value.children.end()};
-    ar(cereal::make_nvp("children", dump));
-}
-
-template <class Archive>
-void load(Archive& archive, inner_node& m)
-{
-    auto vec = std::vector<node_id>{};
-    archive(cereal::make_nvp("children", vec));
-    m.children = immer::vector<node_id>{vec.begin(), vec.end()};
+    auto& children = value.children;
+    ar(CEREAL_NVP(children));
 }
 
 template <class Archive>

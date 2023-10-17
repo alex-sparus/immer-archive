@@ -105,36 +105,9 @@ struct visitor_helper
     }
 };
 
-template <typename T,
-          typename MemoryPolicy,
-          immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL>
-node_id get_leaf_id(immer::detail::rbts::node<T, MemoryPolicy, B, BL>& node)
+template <typename T, typename MemoryPolicy, immer::detail::rbts::bits_t B>
+node_id get_node_id(immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
 {
-    T* first = node.leaf();
-    return reinterpret_cast<node_id>(static_cast<void*>(first));
-}
-
-template <typename T,
-          typename MemoryPolicy,
-          immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL>
-node_id get_inner_id(immer::detail::rbts::node<T, MemoryPolicy, B, BL>& node)
-{
-    using node_t  = immer::detail::rbts::node<T, MemoryPolicy, B, BL>;
-    node_t* inner = *node.inner();
-    return reinterpret_cast<node_id>(static_cast<void*>(inner));
-}
-
-template <typename T,
-          typename MemoryPolicy,
-          immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL>
-node_id get_relaxed_id(immer::detail::rbts::node<T, MemoryPolicy, B, BL>& node)
-{
-    using node_t    = immer::detail::rbts::node<T, MemoryPolicy, B, BL>;
-    using relaxed_t = typename node_t::relaxed_t;
-    relaxed_t* ptr  = node.relaxed();
     return reinterpret_cast<node_id>(static_cast<void*>(ptr));
 }
 
@@ -146,7 +119,7 @@ struct archive_builder
     template <class Pos>
     void regular(Pos& pos)
     {
-        auto id = get_inner_id(*pos.node());
+        auto id = get_node_id(pos.node());
         if (ar.inners.count(id)) {
             return;
         }
@@ -157,12 +130,12 @@ struct archive_builder
             if constexpr (is_regular_pos<ChildPos>) {
                 node_info.children =
                     std::move(node_info.children)
-                        .push_back(get_inner_id(*child_pos.node()));
+                        .push_back(get_node_id(child_pos.node()));
                 regular(child_pos);
             } else if constexpr (is_leaf_pos<ChildPos>) {
                 node_info.children =
                     std::move(node_info.children)
-                        .push_back(get_leaf_id(*child_pos.node()));
+                        .push_back(get_node_id(child_pos.node()));
                 leaf(child_pos);
             }
 
@@ -174,7 +147,7 @@ struct archive_builder
     template <class Pos>
     void relaxed(Pos& pos)
     {
-        auto id = get_relaxed_id(*pos.node());
+        auto id = get_node_id(pos.node());
         if (ar.inners.count(id)) {
             return;
         }
@@ -185,17 +158,17 @@ struct archive_builder
             if constexpr (is_regular_pos<ChildPos>) {
                 node_info.children =
                     std::move(node_info.children)
-                        .push_back(get_inner_id(*child_pos.node()));
+                        .push_back(get_node_id(child_pos.node()));
                 regular(child_pos);
             } else if constexpr (is_relaxed_pos<ChildPos>) {
                 node_info.children =
                     std::move(node_info.children)
-                        .push_back(get_relaxed_id(*child_pos.node()));
+                        .push_back(get_node_id(child_pos.node()));
                 relaxed(child_pos);
             } else if constexpr (is_leaf_pos<ChildPos>) {
                 node_info.children =
                     std::move(node_info.children)
-                        .push_back(get_leaf_id(*child_pos.node()));
+                        .push_back(get_node_id(child_pos.node()));
                 leaf(child_pos);
             }
 
@@ -209,7 +182,7 @@ struct archive_builder
     void leaf(Pos& pos)
     {
         T* first = pos.node()->leaf();
-        auto id  = get_leaf_id(*pos.node());
+        auto id  = get_node_id(pos.node());
         if (ar.leaves.count(id)) {
             // SPDLOG_DEBUG("already seen leaf node {}", id);
             return;
@@ -289,10 +262,10 @@ archive<T> save_vector(const vector_one<T>& vec, archive<T> archive)
     const auto& impl = vec.impl();
     archive          = save_nodes(impl, std::move(archive));
 
-    const auto root_id = get_inner_id(*impl.root);
+    const auto root_id = get_node_id(impl.root);
     assert(archive.inners.count(root_id));
 
-    const auto tail_id = get_leaf_id(*impl.tail);
+    const auto tail_id = get_node_id(impl.tail);
     assert(archive.leaves.count(tail_id));
 
     const auto vector_id =
@@ -315,16 +288,10 @@ archive<T> save_vector(const flex_vector_one<T>& vec, archive<T> archive)
     const auto& impl = vec.impl();
     archive          = save_nodes(impl, std::move(archive));
 
-    const auto root_id = [&] {
-        if (impl.root->relaxed()) {
-            return get_relaxed_id(*impl.root);
-        } else {
-            return get_inner_id(*impl.root);
-        }
-    }();
+    const auto root_id = get_node_id(impl.root);
     assert(archive.inners.count(root_id));
 
-    const auto tail_id = get_leaf_id(*impl.tail);
+    const auto tail_id = get_node_id(impl.tail);
     assert(archive.leaves.count(tail_id));
 
     const auto vector_id =
