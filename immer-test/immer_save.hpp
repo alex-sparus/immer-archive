@@ -8,81 +8,65 @@
 
 namespace immer_archive {
 
-struct is_regular_pos_func
-{
-    template <class... Rest>
-    constexpr bool
-    operator()(const immer::detail::rbts::regular_sub_pos<Rest...>&)
-    {
-        return true;
-    }
-
-    template <class... Rest>
-    constexpr bool operator()(const immer::detail::rbts::full_pos<Rest...>&)
-    {
-        return true;
-    }
-
-    template <class... Rest>
-    constexpr bool operator()(const immer::detail::rbts::regular_pos<Rest...>&)
-    {
-        return true;
-    }
-
-    template <class... Rest>
-    constexpr bool
-    operator()(const immer::detail::rbts::empty_regular_pos<Rest...>&)
-    {
-        return true;
-    }
-};
-
-struct is_leaf_pos_func
-{
-    template <class... Rest>
-    constexpr bool operator()(const immer::detail::rbts::leaf_sub_pos<Rest...>&)
-    {
-        return true;
-    }
-
-    template <class... Rest>
-    constexpr bool
-    operator()(const immer::detail::rbts::full_leaf_pos<Rest...>&)
-    {
-        return true;
-    }
-
-    template <class... Rest>
-    constexpr bool operator()(const immer::detail::rbts::leaf_pos<Rest...>&)
-    {
-        return true;
-    }
-
-    template <class... Rest>
-    constexpr bool
-    operator()(const immer::detail::rbts::empty_leaf_pos<Rest...>&)
-    {
-        return true;
-    }
-};
-
-struct is_relaxed_pos_func
-{
-    template <class... Rest>
-    constexpr bool operator()(immer::detail::rbts::relaxed_pos<Rest...>&)
-    {
-        return true;
-    }
-};
+struct regular_pos_tag
+{};
+struct leaf_pos_tag
+{};
+struct relaxed_pos_tag
+{};
 
 template <class T>
-constexpr bool is_regular_pos = std::is_invocable_v<is_regular_pos_func, T>;
+struct position_tag : std::false_type
+{};
 
-template <class T>
-constexpr bool is_leaf_pos = std::is_invocable_v<is_leaf_pos_func, T>;
+template <class... Rest>
+struct position_tag<immer::detail::rbts::regular_sub_pos<Rest...>>
+{
+    using type = regular_pos_tag;
+};
 
-template <class T>
-constexpr bool is_relaxed_pos = std::is_invocable_v<is_relaxed_pos_func, T>;
+template <class... Rest>
+struct position_tag<immer::detail::rbts::full_pos<Rest...>>
+{
+    using type = regular_pos_tag;
+};
+template <class... Rest>
+struct position_tag<immer::detail::rbts::regular_pos<Rest...>>
+{
+    using type = regular_pos_tag;
+};
+template <class... Rest>
+struct position_tag<immer::detail::rbts::empty_regular_pos<Rest...>>
+{
+    using type = regular_pos_tag;
+};
+
+template <class... Rest>
+struct position_tag<immer::detail::rbts::leaf_sub_pos<Rest...>>
+{
+    using type = leaf_pos_tag;
+};
+template <class... Rest>
+struct position_tag<immer::detail::rbts::full_leaf_pos<Rest...>>
+{
+    using type = leaf_pos_tag;
+};
+template <class... Rest>
+struct position_tag<immer::detail::rbts::leaf_pos<Rest...>>
+{
+    using type = leaf_pos_tag;
+};
+template <class... Rest>
+struct position_tag<immer::detail::rbts::empty_leaf_pos<Rest...>>
+{
+    using type = leaf_pos_tag;
+};
+
+template <class... Rest>
+struct position_tag<immer::detail::rbts::relaxed_pos<Rest...>>
+{
+    using type = relaxed_pos_tag;
+};
 
 struct visitor_helper
 {
@@ -117,7 +101,20 @@ struct archive_builder
     archive_save<T> ar;
 
     template <class Pos>
-    void regular(Pos& pos)
+    void operator()(Pos& pos)
+    {
+        visit(pos);
+    }
+
+    template <class Pos>
+    void visit(Pos& pos)
+    {
+        using Tag = typename position_tag<std::decay_t<Pos>>::type;
+        visit(Tag{}, pos);
+    }
+
+    template <class Pos>
+    void visit(regular_pos_tag, Pos& pos)
     {
         auto id = get_node_id(pos.node());
         if (ar.inners.count(id)) {
@@ -128,21 +125,13 @@ struct archive_builder
         pos.each(visitor_helper{}, [&node_info, this](auto& child_pos) mutable {
             node_info.children = std::move(node_info.children)
                                      .push_back(get_node_id(child_pos.node()));
-
-            using ChildPos = decltype(child_pos);
-            if constexpr (is_regular_pos<ChildPos>) {
-                regular(child_pos);
-            } else if constexpr (is_leaf_pos<ChildPos>) {
-                leaf(child_pos);
-            }
-
-            static_assert(is_regular_pos<ChildPos> || is_leaf_pos<ChildPos>);
+            visit(child_pos);
         });
         ar.inners = std::move(ar.inners).set(id, node_info);
     }
 
     template <class Pos>
-    void relaxed(Pos& pos)
+    void visit(relaxed_pos_tag, Pos& pos)
     {
         auto id = get_node_id(pos.node());
         if (ar.relaxed_inners.count(id)) {
@@ -163,16 +152,7 @@ struct archive_builder
                                      });
             ++index;
 
-            if constexpr (is_regular_pos<ChildPos>) {
-                regular(child_pos);
-            } else if constexpr (is_relaxed_pos<ChildPos>) {
-                relaxed(child_pos);
-            } else if constexpr (is_leaf_pos<ChildPos>) {
-                leaf(child_pos);
-            }
-
-            static_assert(is_regular_pos<ChildPos> ||
-                          is_relaxed_pos<ChildPos> || is_leaf_pos<ChildPos>);
+            visit(child_pos);
         });
 
         assert(node_info.children.size() == r->d.count);
@@ -181,7 +161,7 @@ struct archive_builder
     }
 
     template <class Pos>
-    void leaf(Pos& pos)
+    void visit(leaf_pos_tag, Pos& pos)
     {
         T* first = pos.node()->leaf();
         auto id  = get_node_id(pos.node());
@@ -214,15 +194,7 @@ auto save_nodes(const immer::detail::rbts::rbtree<T, MemoryPolicy, B, 1>& tree,
         .ar = std::move(ar),
     };
 
-    tree.traverse(visitor_helper{}, [&save](auto& pos) {
-        using Pos = decltype(pos);
-        if constexpr (is_regular_pos<Pos>) {
-            save.regular(pos);
-        } else if constexpr (is_leaf_pos<Pos>) {
-            save.leaf(pos);
-        }
-        static_assert(is_regular_pos<Pos> || is_leaf_pos<Pos>);
-    });
+    tree.traverse(visitor_helper{}, save);
 
     return std::move(save.ar);
 }
@@ -241,18 +213,7 @@ auto save_nodes(const immer::detail::rbts::rrbtree<T, MemoryPolicy, B, 1>& tree,
         .ar = std::move(ar),
     };
 
-    tree.traverse(visitor_helper{}, [&save](auto& pos) {
-        using Pos = decltype(pos);
-        if constexpr (is_regular_pos<Pos>) {
-            save.regular(pos);
-        } else if constexpr (is_relaxed_pos<Pos>) {
-            save.relaxed(pos);
-        } else if constexpr (is_leaf_pos<Pos>) {
-            save.leaf(pos);
-        }
-        static_assert(is_regular_pos<Pos> || is_relaxed_pos<Pos> ||
-                      is_leaf_pos<Pos>);
-    });
+    tree.traverse(visitor_helper{}, save);
 
     auto result = std::move(save.ar);
     return result;

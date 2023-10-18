@@ -4,66 +4,6 @@
 
 namespace immer_archive {
 
-/**
- * B must be fixed and the same as during serialization, otherwise nothing would
- * make sense.
- */
-template <typename T,
-          typename MemoryPolicy         = immer::default_memory_policy,
-          immer::detail::rbts::bits_t B = immer::default_bits>
-struct rbtree_builder
-{
-    static constexpr auto BL = immer::detail::rbts::bits_t{1};
-    using rbtree = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
-    using node_t = typename rbtree::node_t;
-
-    size_t size;
-    immer::detail::rbts::shift_t shift;
-    node_t* root;
-    node_t* tail;
-
-    rbtree_builder(size_t size_, immer::detail::rbts::shift_t shift_)
-        : size{size_}
-        , shift{shift_}
-        , root{rbtree::empty_root()}
-        , tail{rbtree::empty_tail()}
-    {
-    }
-
-    auto tail_offset() const
-    {
-        using immer::detail::rbts::mask;
-        return size ? (size - 1) & ~mask<BL> : 0;
-    }
-
-    template <typename Visitor, typename... Args>
-    void traverse(Visitor v, Args&&... args) const
-    {
-        auto tail_off  = tail_offset();
-        auto tail_size = size - tail_off;
-
-        if (tail_off)
-            make_regular_sub_pos(root, shift, tail_off).visit(v, args...);
-        else
-            make_empty_regular_pos(root).visit(v, args...);
-
-        make_leaf_sub_pos(tail, tail_size).visit(v, args...);
-    }
-
-    void build()
-    {
-        traverse(visitor_helper{}, [](auto& pos) {
-            using Pos = decltype(pos);
-            if constexpr (is_regular_pos<Pos>) {
-                // save.regular(pos);
-            } else if constexpr (is_leaf_pos<Pos>) {
-                // save.leaf(pos);
-            }
-            static_assert(is_regular_pos<Pos> || is_leaf_pos<Pos>);
-        });
-    }
-};
-
 // XXX: Ignoring ref counting completely for now, memory will leak
 template <class T,
           typename MemoryPolicy         = immer::default_memory_policy,
@@ -71,8 +11,8 @@ template <class T,
 struct loader
 {
     static constexpr auto BL = immer::detail::rbts::bits_t{1};
-    using builder            = rbtree_builder<T, MemoryPolicy, B>;
-    using node_t             = typename builder::node_t;
+    using rbtree = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
+    using node_t = typename rbtree::node_t;
 
     const archive_load<T> ar;
     immer::map<node_id, node_t*> leaves;
