@@ -159,16 +159,15 @@ struct loader
         relaxed->relaxed()->d.count = n;
         IMMER_TRY {
             auto index = std::size_t{};
-            auto sizes = std::size_t{};
-            for (const auto& child_node_id : node_info->children) {
+            for (const auto& [child_node_id, child_size] :
+                 node_info->children) {
                 auto* child = load_some_node(child_node_id);
                 if (!child) {
                     throw std::invalid_argument{fmt::format(
                         "Failed to load node ID {}", child_node_id)};
                 }
-                relaxed->inner()[index] = child;
-                sizes += get_count(child_node_id);
-                relaxed->relaxed()->d.sizes[index] = sizes;
+                relaxed->inner()[index]            = child;
+                relaxed->relaxed()->d.sizes[index] = child_size;
                 ++index;
             }
         }

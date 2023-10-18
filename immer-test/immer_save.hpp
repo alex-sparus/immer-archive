@@ -126,16 +126,13 @@ struct archive_builder
 
         auto node_info = inner_node{};
         pos.each(visitor_helper{}, [&node_info, this](auto& child_pos) mutable {
+            node_info.children = std::move(node_info.children)
+                                     .push_back(get_node_id(child_pos.node()));
+
             using ChildPos = decltype(child_pos);
             if constexpr (is_regular_pos<ChildPos>) {
-                node_info.children =
-                    std::move(node_info.children)
-                        .push_back(get_node_id(child_pos.node()));
                 regular(child_pos);
             } else if constexpr (is_leaf_pos<ChildPos>) {
-                node_info.children =
-                    std::move(node_info.children)
-                        .push_back(get_node_id(child_pos.node()));
                 leaf(child_pos);
             }
 
@@ -153,28 +150,33 @@ struct archive_builder
         }
 
         auto node_info = relaxed_inner_node{};
-        pos.each(visitor_helper{}, [&node_info, this](auto& child_pos) mutable {
-            using ChildPos = decltype(child_pos);
+
+        auto* node = pos.node();
+        auto* r    = node->relaxed();
+        auto index = std::size_t{};
+        pos.each(visitor_helper{}, [&](auto& child_pos) mutable {
+            using ChildPos     = decltype(child_pos);
+            node_info.children = std::move(node_info.children)
+                                     .push_back(relaxed_child{
+                                         .node = get_node_id(child_pos.node()),
+                                         .size = r->d.sizes[index],
+                                     });
+            ++index;
+
             if constexpr (is_regular_pos<ChildPos>) {
-                node_info.children =
-                    std::move(node_info.children)
-                        .push_back(get_node_id(child_pos.node()));
                 regular(child_pos);
             } else if constexpr (is_relaxed_pos<ChildPos>) {
-                node_info.children =
-                    std::move(node_info.children)
-                        .push_back(get_node_id(child_pos.node()));
                 relaxed(child_pos);
             } else if constexpr (is_leaf_pos<ChildPos>) {
-                node_info.children =
-                    std::move(node_info.children)
-                        .push_back(get_node_id(child_pos.node()));
                 leaf(child_pos);
             }
 
             static_assert(is_regular_pos<ChildPos> ||
                           is_relaxed_pos<ChildPos> || is_leaf_pos<ChildPos>);
         });
+
+        assert(node_info.children.size() == r->d.count);
+
         ar.relaxed_inners = std::move(ar.relaxed_inners).set(id, node_info);
     }
 

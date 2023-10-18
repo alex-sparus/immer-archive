@@ -46,9 +46,15 @@ struct inner_node
     immer::vector<node_id> children;
 };
 
+struct relaxed_child
+{
+    node_id node;
+    std::size_t size;
+};
+
 struct relaxed_inner_node
 {
-    immer::vector<node_id> children;
+    immer::vector<relaxed_child> children;
 };
 
 template <class T>
@@ -148,6 +154,14 @@ void serialize(Archive& ar, inner_node& value)
 {
     auto& children = value.children;
     ar(CEREAL_NVP(children));
+}
+
+template <class Archive>
+void serialize(Archive& ar, relaxed_child& value)
+{
+    auto& node = value.node;
+    auto& size = value.size;
+    ar(CEREAL_NVP(node), CEREAL_NVP(size));
 }
 
 template <class Archive>
