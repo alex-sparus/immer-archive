@@ -114,7 +114,7 @@ node_id get_node_id(immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
 template <class T>
 struct archive_builder
 {
-    archive<T> ar;
+    archive_save<T> ar;
 
     template <class Pos>
     void regular(Pos& pos)
@@ -148,11 +148,11 @@ struct archive_builder
     void relaxed(Pos& pos)
     {
         auto id = get_node_id(pos.node());
-        if (ar.inners.count(id)) {
+        if (ar.relaxed_inners.count(id)) {
             return;
         }
 
-        auto node_info = inner_node{};
+        auto node_info = relaxed_inner_node{};
         pos.each(visitor_helper{}, [&node_info, this](auto& child_pos) mutable {
             using ChildPos = decltype(child_pos);
             if constexpr (is_regular_pos<ChildPos>) {
@@ -175,7 +175,7 @@ struct archive_builder
             static_assert(is_regular_pos<ChildPos> ||
                           is_relaxed_pos<ChildPos> || is_leaf_pos<ChildPos>);
         });
-        ar.inners = std::move(ar.inners).set(id, node_info);
+        ar.relaxed_inners = std::move(ar.relaxed_inners).set(id, node_info);
     }
 
     template <class Pos>
@@ -190,7 +190,7 @@ struct archive_builder
 
         // SPDLOG_DEBUG("leaf node {}", id);
 
-        auto info = leaf_node<T>{
+        auto info = leaf_node_save<T>{
             .begin = first,
             .end   = first + pos.count(),
         };
@@ -257,7 +257,7 @@ auto save_nodes(const immer::detail::rbts::rrbtree<T, MemoryPolicy, B, 1>& tree,
 }
 
 template <class T>
-archive<T> save_vector(const vector_one<T>& vec, archive<T> archive)
+archive_save<T> save_vector(vector_one<T> vec, archive_save<T> archive)
 {
     const auto& impl = vec.impl();
     archive          = save_nodes(impl, std::move(archive));
@@ -272,38 +272,41 @@ archive<T> save_vector(const vector_one<T>& vec, archive<T> archive)
         reinterpret_cast<node_id>(static_cast<const void*>(&impl));
     archive.vectors = std::move(archive.vectors)
                           .set(vector_id,
-                               vector{
-                                   .root  = root_id,
-                                   .tail  = tail_id,
-                                   .size  = impl.size,
-                                   .shift = impl.shift,
+                               vector<T>{
+                                   .root   = root_id,
+                                   .tail   = tail_id,
+                                   .size   = impl.size,
+                                   .shift  = impl.shift,
+                                   .vector = std::move(vec),
                                });
 
     return archive;
 }
 
 template <class T>
-archive<T> save_vector(const flex_vector_one<T>& vec, archive<T> archive)
+archive_save<T> save_vector(flex_vector_one<T> vec, archive_save<T> archive)
 {
     const auto& impl = vec.impl();
     archive          = save_nodes(impl, std::move(archive));
 
     const auto root_id = get_node_id(impl.root);
-    assert(archive.inners.count(root_id));
+    assert(archive.inners.count(root_id) ||
+           archive.relaxed_inners.count(root_id));
 
     const auto tail_id = get_node_id(impl.tail);
     assert(archive.leaves.count(tail_id));
 
     const auto vector_id =
         reinterpret_cast<node_id>(static_cast<const void*>(&impl));
-    archive.vectors = std::move(archive.vectors)
-                          .set(vector_id,
-                               vector{
-                                   .root  = root_id,
-                                   .tail  = tail_id,
-                                   .size  = impl.size,
-                                   .shift = impl.shift,
-                               });
+    archive.flex_vectors = std::move(archive.flex_vectors)
+                               .set(vector_id,
+                                    flex_vector<T>{
+                                        .root   = root_id,
+                                        .tail   = tail_id,
+                                        .size   = impl.size,
+                                        .shift  = impl.shift,
+                                        .vector = std::move(vec),
+                                    });
 
     return archive;
 }

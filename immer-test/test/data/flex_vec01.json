@@ -1,0 +1,46 @@
+{
+    "value0": {
+        "leaves": [
+            {
+                "key": 4342612992,
+                "value": []
+            },
+            {
+                "key": 5434788256,
+                "value": [
+                    123
+                ]
+            }
+        ],
+        "inners": [
+            {
+                "key": 4342612696,
+                "value": {
+                    "children": []
+                }
+            }
+        ],
+        "relaxed_inners": [],
+        "vectors": [],
+        "flex_vectors": [
+            {
+                "key": 6124699328,
+                "value": {
+                    "root": 4342612696,
+                    "tail": 5434788256,
+                    "size": 1,
+                    "shift": 1
+                }
+            },
+            {
+                "key": 6124699440,
+                "value": {
+                    "root": 4342612696,
+                    "tail": 4342612992,
+                    "size": 0,
+                    "shift": 1
+                }
+            }
+        ]
+    }
+}

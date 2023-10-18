@@ -74,9 +74,10 @@ struct loader
     using builder            = rbtree_builder<T, MemoryPolicy, B>;
     using node_t             = typename builder::node_t;
 
-    const archive<T> ar;
+    const archive_load<T> ar;
     immer::map<node_id, node_t*> leaves;
     immer::map<node_id, node_t*> strict_inners;
+    immer::map<node_id, node_t*> relaxed_inners;
 
     node_t* load_leaf(node_id id)
     {
@@ -141,6 +142,46 @@ struct loader
         return inner;
     }
 
+    node_t* load_relaxed(node_id id)
+    {
+        if (auto* p = relaxed_inners.find(id)) {
+            node_t* node = *p;
+            return node->inc();
+        }
+
+        auto* node_info = ar.relaxed_inners.find(id);
+        if (!node_info) {
+            return nullptr;
+        }
+
+        const auto n                = node_info->children.size();
+        auto* relaxed               = node_t::make_inner_r_n(n);
+        relaxed->relaxed()->d.count = n;
+        IMMER_TRY {
+            auto index = std::size_t{};
+            auto sizes = std::size_t{};
+            for (const auto& child_node_id : node_info->children) {
+                auto* child = load_some_node(child_node_id);
+                if (!child) {
+                    throw std::invalid_argument{fmt::format(
+                        "Failed to load node ID {}", child_node_id)};
+                }
+                relaxed->inner()[index] = child;
+                sizes += get_count(child_node_id);
+                relaxed->relaxed()->d.sizes[index] = sizes;
+                ++index;
+            }
+        }
+        IMMER_CATCH (...) {
+            node_t::delete_inner_r(relaxed, n);
+            IMMER_RETHROW;
+        }
+        // XXX inc
+        strict_inners = std::move(strict_inners).set(id, relaxed->inc());
+
+        return relaxed;
+    }
+
     node_t* load_some_node(node_id id)
     {
         // Unknown type: leaf, inner or relaxed
@@ -150,7 +191,9 @@ struct loader
         if (ar.inners.count(id)) {
             return load_strict(id);
         }
-        // XXX handle relaxed
+        if (ar.relaxed_inners.count(id)) {
+            return load_relaxed(id);
+        }
         return nullptr;
     }
 
@@ -175,6 +218,41 @@ struct loader
         impl.root  = root;
         impl.tail  = tail;
         return vector_one<T, MemoryPolicy, B>{std::move(impl)};
+    }
+
+    std::optional<flex_vector_one<T, MemoryPolicy, B>>
+    load_flex_vector(node_id id)
+    {
+        auto* info = ar.flex_vectors.find(id);
+        if (!info) {
+            return std::nullopt;
+        }
+
+        auto* root = load_some_node(info->root);
+        auto* tail = load_leaf(info->tail);
+        assert(root);
+        assert(tail);
+        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{};
+        // XXX add a way to construct it directly, this will lead to memory leak
+        impl.size  = info->size;
+        impl.shift = info->shift;
+        impl.root  = root;
+        impl.tail  = tail;
+        return vector_one<T, MemoryPolicy, B>{std::move(impl)};
+    }
+
+    std::size_t get_count(node_id id)
+    {
+        if (auto* p = ar.leaves.find(id)) {
+            return p->data.size();
+        }
+        if (auto* p = ar.inners.find(id)) {
+            return p->children.size();
+        }
+        if (auto* p = ar.relaxed_inners.find(id)) {
+            return p->children.size();
+        }
+        return 0;
     }
 };
 

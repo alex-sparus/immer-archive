@@ -47,20 +47,44 @@ T from_json(std::string input)
     return r;
 }
 
-immer_archive::archive<int> load_archive(std::string_view filename)
+std::vector<immer_archive::archive_load<int>>
+load_archive(std::string_view filename)
 {
-    auto is = std::ifstream{filename};
-    if (!is) {
-        throw std::runtime_error{
-            fmt::format("Failed to read from {}", filename)};
-    }
+    const auto open = [&] {
+        auto is = std::ifstream{filename};
+        if (!is) {
+            throw std::runtime_error{
+                fmt::format("Failed to read from {}", filename)};
+        }
+        return is;
+    };
 
-    auto result = immer_archive::archive<int>{};
-    {
-        auto ar = cereal::JSONInputArchive{is};
-        ar(result);
+    try {
+        auto result = immer_archive::archive_load<int>{};
+        auto is     = open();
+        {
+            auto ar = cereal::JSONInputArchive{is};
+            ar(result);
+        }
+        return {result};
+    } catch (const cereal::Exception&) {
+        auto result = std::vector<immer_archive::archive_load<int>>{};
+        auto is     = open();
+        {
+            auto ar = cereal::JSONInputArchive{is};
+            ar(result);
+        }
+        return result;
     }
-    return result;
+}
+
+auto load(auto name)
+{
+    const bool xcode = false;
+    SPDLOG_DEBUG("loading {}", name);
+    auto prefix =
+        (xcode ? std::string{"../"} : "") + "../immer-test/test/data/";
+    return load_archive(prefix + name);
 }
 
 void save_to_file(std::string_view filename, std::string_view data)
@@ -96,6 +120,12 @@ void test_vector()
         auto ar          = save_vector(empty, {});
         ar               = save_vector(one, ar);
         save_to_file("vec01.json", to_json(ar));
+    }
+
+    {
+        const auto vec = gen(example_vector{}, 7);
+        auto ar        = save_vector(vec, {});
+        save_to_file("vec7.json", to_json(ar));
     }
 
     {
@@ -141,21 +171,30 @@ void test_flex_vector()
         const auto one   = empty.push_back(123);
         auto ar          = save_vector(empty, {});
         ar               = save_vector(one, ar);
-        SPDLOG_DEBUG("empty and one archive = {}", to_json(ar));
+        save_to_file("flex_vec01.json", to_json(ar));
     }
 
     const auto v1 = gen(immer_archive::flex_vector_one<int>{}, 3);
     const auto v2 = gen(immer_archive::flex_vector_one<int>{}, 4);
-
     const auto v3 = v1 + v2;
+
+    const auto v50  = gen(v3, 50);
+    const auto v100 = v50 + v50;
+    const auto v52  = v50 + v2;
 
     auto ar = save_vector(v1, {});
     ar      = save_vector(v2, ar);
     ar      = save_vector(v3, ar);
+    ar      = save_vector(v50, ar);
+    ar      = save_vector(v100, ar);
+    ar      = save_vector(v52, ar);
 
-    SPDLOG_DEBUG("archive = {}", to_json(ar));
-    SPDLOG_DEBUG("archive2 = {}", to_json(save_vector(v1, {})));
-    SPDLOG_DEBUG("archive2 = {}", to_json(save_vector(v3, {})));
+    auto archives = std::vector<immer_archive::archive_save<int>>{
+        ar,
+        save_vector(v1, {}),
+        save_vector(v3, {}),
+    };
+    save_to_file("flex_concat.json", to_json(archives));
 }
 
 void test_save_and_load()
@@ -163,16 +202,13 @@ void test_save_and_load()
     auto test_vectors = std::vector<example_vector>{// gen(example_vector{}, 67)
                                                     example_vector{}};
     auto counter      = std::size_t{};
-    auto ar           = immer_archive::archive<int>{};
+    auto ar           = immer_archive::archive_save<int>{};
     const auto save_and_load = [&]() {
         auto vec = test_vectors.back().push_back(++counter);
         test_vectors.push_back(vec);
-        ar           = immer_archive::save_vector(vec, ar);
-        auto ar_json = to_json(ar);
-        SPDLOG_DEBUG("ar = {}", ar_json);
+        ar = immer_archive::save_vector(vec, ar);
 
-        auto loader = immer_archive::loader<int>{
-            from_json<immer_archive::archive<int>>(ar_json)};
+        auto loader     = immer_archive::loader<int>{fix_leaf_nodes(ar)};
         auto loaded_vec = loader.load_vector(ar.vectors.begin()->first);
         assert(loaded_vec.has_value());
         assert(*loaded_vec == vec);
@@ -190,33 +226,53 @@ void test_save_and_load()
 
 void test_read_vector()
 {
-    const bool xcode = false;
-    const auto load  = [](auto name) {
-        SPDLOG_DEBUG("loading {}", name);
-        auto prefix =
-            (xcode ? std::string{"../"} : "") + "../immer-test/test/data/";
-        return load_archive(prefix + name);
-    };
-
     const auto check_file = [&](auto name) {
-        auto ar     = load(name);
-        auto loader = immer_archive::loader<int>{ar};
-        for (const auto& [vector_id, vector_info] : ar.vectors) {
-            auto vec = loader.load_vector(vector_id);
-            assert(vec.value().impl().check_tree());
+        const auto archives = load(name);
+        for (const auto& ar : archives) {
+            auto loader = immer_archive::loader<int>{ar};
+            for (const auto& [vector_id, vector_info] : ar.vectors) {
+                auto vec = loader.load_vector(vector_id);
+                assert(vec.value().impl().check_tree());
 
-            // Iterate over the whole read vector, just to test.
-            immer::vector<int> test;
-            for (int i : vec.value()) {
-                test = std::move(test).push_back(i);
+                // Iterate over the whole read vector, just to test.
+                immer::vector<int> test;
+                for (int i : vec.value()) {
+                    test = std::move(test).push_back(i);
+                }
+                SPDLOG_DEBUG("tested vector size {}", test.size());
             }
-            SPDLOG_DEBUG("tested vector size {}", test.size());
         }
     };
 
     check_file("vec66.json");
     check_file("vec01.json");
     check_file("huge_vectors.json");
+}
+
+void test_read_flex_vector()
+{
+    const auto check_file = [&](auto name) {
+        const auto archives = load(name);
+        for (const auto& ar : archives) {
+            auto loader = immer_archive::loader<int>{ar};
+            for (const auto& [vector_id, vector_info] : ar.flex_vectors) {
+                auto vec = loader.load_flex_vector(vector_id);
+                assert(vec.value().impl().check_tree());
+
+                // Iterate over the whole read vector, just to test.
+                auto test = example_vector{};
+                for (int i : vec.value()) {
+                    test = std::move(test).push_back(i);
+                }
+                assert(test == vec.value());
+                SPDLOG_DEBUG("tested vector size {}", test.size());
+                SPDLOG_DEBUG("vec = {}", to_json(vec.value()));
+            }
+        }
+    };
+
+    check_file("flex_vec01.json");
+    check_file("flex_concat.json");
 }
 
 } // namespace
@@ -233,9 +289,10 @@ int main(int argc, const char* argv[])
     // traverse_nodes(big_branches.impl());
 
     // test_vector();
-    // test_flex_vector();
+    test_flex_vector();
     // test_save_and_load();
-    test_read_vector();
+    // test_read_vector();
+    test_read_flex_vector();
 
     return 0;
 }
