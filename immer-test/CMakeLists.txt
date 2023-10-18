@@ -17,10 +17,11 @@ add_executable(MyExample main.cpp)
 target_include_directories(MyExample PRIVATE immer .)
 target_link_libraries(MyExample PRIVATE spdlog::spdlog)
 
-target_compile_options(MyExample INTERFACE
-    -fno-omit-frame-pointer -fsanitize-coverage=trace-pc-guard -fsanitize=address)
-target_compile_definitions(MyExample INTERFACE BOOST_USE_ASAN=1)
-target_link_options(MyExample INTERFACE -fsanitize=address)
+# ninja && ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=suppressions=../suppr.txt ./MyExample
+target_compile_options(MyExample PRIVATE
+    -fno-omit-frame-pointer -fsanitize-coverage=trace-pc-guard -fsanitize=leak)
+target_compile_definitions(MyExample PRIVATE BOOST_USE_ASAN=1)
+target_link_options(MyExample PRIVATE -fsanitize=leak)
 
 target_compile_options(MyExample PRIVATE
     $<$<CXX_COMPILER_ID:Clang>:-g>
