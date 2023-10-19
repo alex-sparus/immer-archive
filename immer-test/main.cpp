@@ -275,32 +275,45 @@ void test_read_flex_vector()
 void test_shared_nodes_loading()
 {
     // Create a bunch of vectors with shared nodes
-    const auto v1      = gen(example_vector{}, 69);
-    const auto v2      = v1.push_back(900);
-    const auto v3      = v2.push_back(901);
-    const auto vectors = std::vector<example_vector>{v1, v2, v3};
+    const auto generate_vectors = [] {
+        const auto v1 = gen(example_vector{}, 69);
+        const auto v2 = v1.push_back(900);
+        const auto v3 = v2.push_back(901);
+        return std::vector<example_vector>{v1, v2, v3};
+    };
 
     // Save them
-    auto ar  = immer_archive::archive_save<int>{};
-    auto ids = std::vector<immer_archive::node_id>{};
-    for (const auto& v : vectors) {
-        auto [ar2, id] = save_vector(v, ar);
-        ar             = ar2;
-        ids.push_back(id);
-    }
-    assert(ids.size() == vectors.size());
-    SPDLOG_DEBUG("ids = {}", to_json(ids));
-    SPDLOG_DEBUG("archive = {}", to_json(ar));
+    const auto save_vectors = [](const auto& vectors)
+        -> std::pair<immer_archive::archive_save<int>,
+                     std::vector<immer_archive::node_id>> {
+        auto ar  = immer_archive::archive_save<int>{};
+        auto ids = std::vector<immer_archive::node_id>{};
+        for (const auto& v : vectors) {
+            auto [ar2, id] = save_vector(v, ar);
+            ar             = ar2;
+            ids.push_back(id);
+        }
+        assert(ids.size() == vectors.size());
+        return {std::move(ar), std::move(ids)};
+    };
 
+    const auto vectors   = generate_vectors();
+    const auto [ar, ids] = save_vectors(vectors);
+
+    {
+        // Check that if we generate the same but independent vectors and save
+        // them again, the archives look the same
+        const auto [ar2, ids2] = save_vectors(generate_vectors());
+        assert(to_json(ar) == to_json(ar2));
+    }
+
+    // Load them and verify they're equal to the original vectors
     auto loader = immer_archive::loader<int>{fix_leaf_nodes(ar)};
     std::vector<example_vector> loaded;
     auto index = std::size_t{};
     for (const auto& id : ids) {
         auto v = loader.load_vector(id);
         assert(v.has_value());
-        SPDLOG_DEBUG("{} same == {}", index, v.value() == vectors[index]);
-        SPDLOG_DEBUG("original = {}", to_json(vectors[index]));
-        SPDLOG_DEBUG("loaded = {}", to_json(v.value()));
         assert(v.value() == vectors[index]);
         loaded.push_back(v.value());
         ++index;

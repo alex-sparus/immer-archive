@@ -78,7 +78,7 @@ private:
             : ptr{ptr_}
             , deleter{std::move(deleter_)}
         {
-            SPDLOG_DEBUG("ctor {} with ptr {}", (void*) this, (void*) ptr);
+            SPDLOG_TRACE("ctor {} with ptr {}", (void*) this, (void*) ptr);
             // Assuming the node has just been created and not calling inc() on
             // it.
         }
@@ -92,7 +92,7 @@ private:
             : ptr{other.ptr}
             , deleter{other.deleter}
         {
-            SPDLOG_DEBUG("copy ctor {} from {}", (void*) this, (void*) &other);
+            SPDLOG_TRACE("copy ctor {} from {}", (void*) this, (void*) &other);
             if (ptr) {
                 ptr->inc();
             }
@@ -102,12 +102,12 @@ private:
             : ptr{other.release()}
             , deleter{other.deleter}
         {
-            SPDLOG_DEBUG("move ctor {} from {}", (void*) this, (void*) &other);
+            SPDLOG_TRACE("move ctor {} from {}", (void*) this, (void*) &other);
         }
 
         node_ptr& operator=(node_ptr&& other)
         {
-            SPDLOG_DEBUG("move assign {} = {}", (void*) this, (void*) &other);
+            SPDLOG_TRACE("move assign {} = {}", (void*) this, (void*) &other);
             auto temp = node_ptr{std::move(other)};
             using std::swap;
             swap(ptr, temp.ptr);
@@ -117,9 +117,9 @@ private:
 
         ~node_ptr()
         {
-            SPDLOG_DEBUG("dtor {}", (void*) this);
+            SPDLOG_TRACE("dtor {}", (void*) this);
             if (ptr && ptr->dec()) {
-                SPDLOG_DEBUG("calling deleter for {}", (void*) ptr);
+                SPDLOG_TRACE("calling deleter for {}", (void*) ptr);
                 deleter(ptr);
             }
         }

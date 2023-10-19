@@ -2,11 +2,11 @@
     "value0": {
         "leaves": [
             {
-                "key": 4342400200,
+                "key": 1,
                 "value": []
             },
             {
-                "key": 4392766480,
+                "key": 2,
                 "value": [
                     123
                 ]
@@ -14,7 +14,7 @@
         ],
         "inners": [
             {
-                "key": 4342399904,
+                "key": 0,
                 "value": {
                     "children": []
                 }
@@ -26,8 +26,8 @@
             {
                 "key": 0,
                 "value": {
-                    "root": 4342399904,
-                    "tail": 4342400200,
+                    "root": 0,
+                    "tail": 1,
                     "size": 0,
                     "shift": 1
                 }
@@ -35,8 +35,8 @@
             {
                 "key": 1,
                 "value": {
-                    "root": 4342399904,
-                    "tail": 4392766480,
+                    "root": 0,
+                    "tail": 2,
                     "size": 1,
                     "shift": 1
                 }

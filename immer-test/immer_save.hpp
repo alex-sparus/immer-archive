@@ -90,9 +90,19 @@ struct visitor_helper
 };
 
 template <typename T, typename MemoryPolicy, immer::detail::rbts::bits_t B>
-node_id get_node_id(immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
+std::pair<archive_save<T>, node_id>
+get_node_id(archive_save<T> ar,
+            immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
 {
-    return reinterpret_cast<node_id>(static_cast<void*>(ptr));
+    auto* ptr_void = static_cast<void*>(ptr);
+    if (auto* maybe_id = ar.node_ptr_to_id.find(ptr_void)) {
+        auto id = *maybe_id;
+        return {std::move(ar), id};
+    }
+
+    const auto id     = ar.node_ptr_to_id.size();
+    ar.node_ptr_to_id = std::move(ar.node_ptr_to_id).set(ptr_void, id);
+    return {std::move(ar), id};
 }
 
 template <class T>
@@ -178,6 +188,14 @@ struct archive_builder
         };
         ar.leaves = std::move(ar.leaves).set(id, std::move(info));
     }
+
+    template <typename MemoryPolicy, immer::detail::rbts::bits_t B>
+    node_id get_node_id(immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
+    {
+        auto [ar2, id] = immer_archive::get_node_id(std::move(ar), ptr);
+        ar             = std::move(ar2);
+        return id;
+    }
 };
 
 template <typename T,
@@ -223,12 +241,14 @@ template <class T>
 std::pair<archive_save<T>, node_id> save_vector(vector_one<T> vec,
                                                 archive_save<T> archive)
 {
-    const auto& impl   = vec.impl();
-    const auto root_id = get_node_id(impl.root);
-    const auto tail_id = get_node_id(impl.tail);
-    const auto tree_id = rbts_id{
-        .root = root_id,
-        .tail = tail_id,
+    const auto& impl           = vec.impl();
+    auto root_id               = node_id{};
+    auto tail_id               = node_id{};
+    std::tie(archive, root_id) = get_node_id(std::move(archive), impl.root);
+    std::tie(archive, tail_id) = get_node_id(std::move(archive), impl.tail);
+    const auto tree_id         = rbts_id{
+                .root = root_id,
+                .tail = tail_id,
     };
 
     if (auto* p = archive.rbts_to_id.find(tree_id)) {
@@ -266,12 +286,14 @@ template <class T>
 std::pair<archive_save<T>, node_id> save_vector(flex_vector_one<T> vec,
                                                 archive_save<T> archive)
 {
-    const auto& impl   = vec.impl();
-    const auto root_id = get_node_id(impl.root);
-    const auto tail_id = get_node_id(impl.tail);
-    const auto tree_id = rbts_id{
-        .root = root_id,
-        .tail = tail_id,
+    const auto& impl           = vec.impl();
+    auto root_id               = node_id{};
+    auto tail_id               = node_id{};
+    std::tie(archive, root_id) = get_node_id(std::move(archive), impl.root);
+    std::tie(archive, tail_id) = get_node_id(std::move(archive), impl.tail);
+    const auto tree_id         = rbts_id{
+                .root = root_id,
+                .tail = tail_id,
     };
 
     if (auto* p = archive.rbts_to_id.find(tree_id)) {
