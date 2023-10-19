@@ -65,6 +65,19 @@ struct rbts_info
     immer::detail::rbts::shift_t shift;
 };
 
+struct rbts_id
+{
+    node_id root;
+    node_id tail;
+
+    auto tie() const { return std::tie(root, tail); }
+
+    friend bool operator==(const rbts_id& left, const rbts_id& right)
+    {
+        return left.tie() == right.tie();
+    }
+};
+
 template <class T>
 struct vector_save
 {
@@ -93,23 +106,27 @@ struct flex_vector_load
     rbts_info rbts;
 };
 
-template <class T, class Leaf, class Vector, class FlexVector>
-struct archive
+template <class T>
+struct archive_save
 {
-    immer::map<node_id, Leaf> leaves;
+    immer::map<node_id, leaf_node_save<T>> leaves;
     immer::map<node_id, inner_node> inners;
     immer::map<node_id, relaxed_inner_node> relaxed_inners;
-    immer::map<node_id, Vector> vectors;
-    immer::map<node_id, FlexVector> flex_vectors;
+    immer::map<node_id, vector_save<T>> vectors;
+    immer::map<node_id, flex_vector_save<T>> flex_vectors;
+
+    immer::map<rbts_id, node_id> rbts_to_id;
 };
 
 template <class T>
-using archive_load =
-    archive<T, leaf_node_load<T>, vector_load<T>, flex_vector_load<T>>;
-
-template <class T>
-using archive_save =
-    archive<T, leaf_node_save<T>, vector_save<T>, flex_vector_save<T>>;
+struct archive_load
+{
+    immer::map<node_id, leaf_node_load<T>> leaves;
+    immer::map<node_id, inner_node> inners;
+    immer::map<node_id, relaxed_inner_node> relaxed_inners;
+    immer::map<node_id, vector_load<T>> vectors;
+    immer::map<node_id, flex_vector_load<T>> flex_vectors;
+};
 
 // This is needed to be able to use the archive that was not read from JSON
 // because .data is set only while reading from JSON.
@@ -224,6 +241,14 @@ void load(Archive& ar, rbts_info& value)
     ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(size), CEREAL_NVP(shift));
 }
 
+template <class Archive>
+void serialize(Archive& ar, rbts_id& value)
+{
+    auto& root = value.root;
+    auto& tail = value.tail;
+    ar(CEREAL_NVP(root), CEREAL_NVP(tail));
+}
+
 template <class Archive, class T>
 void save(Archive& ar, const vector_save<T>& value)
 {
@@ -249,7 +274,22 @@ void load(Archive& ar, flex_vector_load<T>& value)
 }
 
 template <class Archive, class... T>
-void serialize(Archive& ar, archive<T...>& value)
+void save(Archive& ar, const archive_save<T...>& value)
+{
+    auto& leaves         = value.leaves;
+    auto& inners         = value.inners;
+    auto& relaxed_inners = value.relaxed_inners;
+    auto& vectors        = value.vectors;
+    auto& flex_vectors   = value.flex_vectors;
+    ar(CEREAL_NVP(leaves),
+       CEREAL_NVP(inners),
+       CEREAL_NVP(relaxed_inners),
+       CEREAL_NVP(vectors),
+       CEREAL_NVP(flex_vectors));
+}
+
+template <class Archive, class... T>
+void load(Archive& ar, archive_load<T...>& value)
 {
     auto& leaves         = value.leaves;
     auto& inners         = value.inners;
@@ -264,3 +304,23 @@ void serialize(Archive& ar, archive<T...>& value)
 }
 
 } // namespace immer_archive
+
+namespace std {
+
+template <>
+struct hash<immer_archive::rbts_id>
+{
+    auto operator()(const immer_archive::rbts_id& x) const
+    {
+        const auto boost_combine = [](std::size_t& seed, std::size_t hash) {
+            seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        };
+
+        auto seed = std::size_t{};
+        boost_combine(seed, hash<immer_archive::node_id>{}(x.root));
+        boost_combine(seed, hash<immer_archive::node_id>{}(x.tail));
+        return seed;
+    }
+};
+
+} // namespace std

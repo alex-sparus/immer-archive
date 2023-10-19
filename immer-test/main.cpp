@@ -101,6 +101,7 @@ void save_to_file(std::string_view filename, std::string_view data)
 namespace {
 
 using example_vector = immer_archive::vector_one<int>;
+using immer_archive::save_vector;
 
 const auto gen = [](auto init, int count) {
     for (int i = 0; i < count; ++i) {
@@ -111,27 +112,25 @@ const auto gen = [](auto init, int count) {
 
 void test_vector()
 {
-    using immer_archive::save_vector;
-
     {
         // empty
         const auto empty = example_vector{};
         const auto one   = empty.push_back(123);
-        auto ar          = save_vector(empty, {});
-        ar               = save_vector(one, ar);
+        auto ar          = save_vector(empty, {}).first;
+        ar               = save_vector(one, ar).first;
         save_to_file("vec01.json", to_json(ar));
     }
 
     {
         const auto vec = gen(example_vector{}, 7);
-        auto ar        = save_vector(vec, {});
+        auto ar        = save_vector(vec, {}).first;
         save_to_file("vec7.json", to_json(ar));
     }
 
     {
         // 66 is the biggest vector with only one inner node
         const auto vec = gen(example_vector{}, 66);
-        auto ar        = save_vector(vec, {});
+        auto ar        = save_vector(vec, {}).first;
         save_to_file("vec66.json", to_json(ar));
     }
 
@@ -153,24 +152,22 @@ void test_vector()
     const auto v68  = v67.push_back(1339);
     const auto v900 = gen(v68, 9999);
 
-    auto ar = save_vector(v65, {});
-    ar      = save_vector(v66, ar);
-    ar      = save_vector(v67, ar);
-    ar      = save_vector(v68, ar);
-    ar      = save_vector(v900, ar);
+    auto ar = save_vector(v65, {}).first;
+    ar      = save_vector(v66, ar).first;
+    ar      = save_vector(v67, ar).first;
+    ar      = save_vector(v68, ar).first;
+    ar      = save_vector(v900, ar).first;
     save_to_file("huge_vectors.json", to_json(ar));
 }
 
 void test_flex_vector()
 {
-    using immer_archive::save_vector;
-
     {
         // empty
         const auto empty = immer_archive::flex_vector_one<int>{};
         const auto one   = empty.push_back(123);
-        auto ar          = save_vector(empty, {});
-        ar               = save_vector(one, ar);
+        auto ar          = save_vector(empty, {}).first;
+        ar               = save_vector(one, ar).first;
         save_to_file("flex_vec01.json", to_json(ar));
     }
 
@@ -182,17 +179,17 @@ void test_flex_vector()
     const auto v100 = v50 + v50;
     const auto v52  = v50 + v2;
 
-    auto ar = save_vector(v1, {});
-    ar      = save_vector(v2, ar);
-    ar      = save_vector(v3, ar);
-    ar      = save_vector(v50, ar);
-    ar      = save_vector(v100, ar);
-    ar      = save_vector(v52, ar);
+    auto ar = save_vector(v1, {}).first;
+    ar      = save_vector(v2, ar).first;
+    ar      = save_vector(v3, ar).first;
+    ar      = save_vector(v50, ar).first;
+    ar      = save_vector(v100, ar).first;
+    ar      = save_vector(v52, ar).first;
 
     auto archives = std::vector<immer_archive::archive_save<int>>{
         ar,
-        save_vector(v1, {}),
-        save_vector(v3, {}),
+        save_vector(v1, {}).first,
+        save_vector(v3, {}).first,
     };
     save_to_file("flex_concat.json", to_json(archives));
 }
@@ -206,7 +203,7 @@ void test_save_and_load()
     const auto save_and_load = [&]() {
         auto vec = test_vectors.back().push_back(++counter);
         test_vectors.push_back(vec);
-        ar = immer_archive::save_vector(vec, ar);
+        ar = immer_archive::save_vector(vec, ar).first;
 
         auto loader     = immer_archive::loader<int>{fix_leaf_nodes(ar)};
         auto loaded_vec = loader.load_vector(ar.vectors.begin()->first);
@@ -275,6 +272,47 @@ void test_read_flex_vector()
     check_file("flex_concat.json");
 }
 
+void test_shared_nodes_loading()
+{
+    // Create a bunch of vectors with shared nodes
+    const auto v1      = gen(example_vector{}, 69);
+    const auto v2      = v1.push_back(900);
+    const auto v3      = v2.push_back(901);
+    const auto vectors = std::vector<example_vector>{v1, v2, v3};
+
+    // Save them
+    auto ar  = immer_archive::archive_save<int>{};
+    auto ids = std::vector<immer_archive::node_id>{};
+    for (const auto& v : vectors) {
+        auto [ar2, id] = save_vector(v, ar);
+        ar             = ar2;
+        ids.push_back(id);
+    }
+    assert(ids.size() == vectors.size());
+    SPDLOG_DEBUG("ids = {}", to_json(ids));
+    SPDLOG_DEBUG("archive = {}", to_json(ar));
+
+    auto loader = immer_archive::loader<int>{fix_leaf_nodes(ar)};
+    std::vector<example_vector> loaded;
+    auto index = std::size_t{};
+    for (const auto& id : ids) {
+        auto v = loader.load_vector(id);
+        assert(v.has_value());
+        SPDLOG_DEBUG("{} same == {}", index, v.value() == vectors[index]);
+        SPDLOG_DEBUG("original = {}", to_json(vectors[index]));
+        SPDLOG_DEBUG("loaded = {}", to_json(v.value()));
+        assert(v.value() == vectors[index]);
+        loaded.push_back(v.value());
+        ++index;
+    }
+
+    SPDLOG_DEBUG("loaded == vectors {}", loaded == vectors);
+    assert(loaded == vectors);
+
+    loaded = {};
+    // Now the loader should deallocated all the nodes it has.
+}
+
 } // namespace
 
 int main(int argc, const char* argv[])
@@ -288,11 +326,12 @@ int main(int argc, const char* argv[])
     // auto big_branches = gen(immer::vector<std::uint64_t>{}, 67);
     // traverse_nodes(big_branches.impl());
 
-    // test_vector();
+    test_vector();
     test_flex_vector();
     // test_save_and_load();
-    // test_read_vector();
+    test_read_vector();
     test_read_flex_vector();
+    test_shared_nodes_loading();
 
     return 0;
 }

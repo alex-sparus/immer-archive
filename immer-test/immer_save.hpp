@@ -220,20 +220,33 @@ auto save_nodes(const immer::detail::rbts::rrbtree<T, MemoryPolicy, B, 1>& tree,
 }
 
 template <class T>
-archive_save<T> save_vector(vector_one<T> vec, archive_save<T> archive)
+std::pair<archive_save<T>, node_id> save_vector(vector_one<T> vec,
+                                                archive_save<T> archive)
 {
-    const auto& impl = vec.impl();
-    archive          = save_nodes(impl, std::move(archive));
-
+    const auto& impl   = vec.impl();
     const auto root_id = get_node_id(impl.root);
-    assert(archive.inners.count(root_id));
-
     const auto tail_id = get_node_id(impl.tail);
+    const auto tree_id = rbts_id{
+        .root = root_id,
+        .tail = tail_id,
+    };
+
+    if (auto* p = archive.rbts_to_id.find(tree_id)) {
+        // Already been saved
+        auto vector_id = *p;
+        return {std::move(archive), vector_id};
+    }
+
+    archive = save_nodes(impl, std::move(archive));
+
+    assert(archive.inners.count(root_id));
     assert(archive.leaves.count(tail_id));
 
-    const auto vector_id =
-        reinterpret_cast<node_id>(static_cast<const void*>(&impl));
-    archive.vectors = std::move(archive.vectors)
+    const auto vector_id = archive.rbts_to_id.size();
+    assert(archive.vectors.count(vector_id) == 0);
+
+    archive.rbts_to_id = std::move(archive.rbts_to_id).set(tree_id, vector_id);
+    archive.vectors    = std::move(archive.vectors)
                           .set(vector_id,
                                vector_save<T>{
                                    .rbts =
@@ -246,24 +259,37 @@ archive_save<T> save_vector(vector_one<T> vec, archive_save<T> archive)
                                    .vector = std::move(vec),
                                });
 
-    return archive;
+    return {std::move(archive), vector_id};
 }
 
 template <class T>
-archive_save<T> save_vector(flex_vector_one<T> vec, archive_save<T> archive)
+std::pair<archive_save<T>, node_id> save_vector(flex_vector_one<T> vec,
+                                                archive_save<T> archive)
 {
-    const auto& impl = vec.impl();
-    archive          = save_nodes(impl, std::move(archive));
-
+    const auto& impl   = vec.impl();
     const auto root_id = get_node_id(impl.root);
+    const auto tail_id = get_node_id(impl.tail);
+    const auto tree_id = rbts_id{
+        .root = root_id,
+        .tail = tail_id,
+    };
+
+    if (auto* p = archive.rbts_to_id.find(tree_id)) {
+        // Already been saved
+        auto vector_id = *p;
+        return {std::move(archive), vector_id};
+    }
+
+    archive = save_nodes(impl, std::move(archive));
+
     assert(archive.inners.count(root_id) ||
            archive.relaxed_inners.count(root_id));
-
-    const auto tail_id = get_node_id(impl.tail);
     assert(archive.leaves.count(tail_id));
 
-    const auto vector_id =
-        reinterpret_cast<node_id>(static_cast<const void*>(&impl));
+    const auto vector_id = archive.rbts_to_id.size();
+    assert(archive.flex_vectors.count(vector_id) == 0);
+
+    archive.rbts_to_id = std::move(archive.rbts_to_id).set(tree_id, vector_id);
     archive.flex_vectors = std::move(archive.flex_vectors)
                                .set(vector_id,
                                     flex_vector_save<T>{
@@ -277,7 +303,7 @@ archive_save<T> save_vector(flex_vector_one<T> vec, archive_save<T> archive)
                                         .vector = std::move(vec),
                                     });
 
-    return archive;
+    return {std::move(archive), vector_id};
 }
 
 } // namespace immer_archive
