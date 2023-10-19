@@ -235,11 +235,14 @@ archive_save<T> save_vector(vector_one<T> vec, archive_save<T> archive)
         reinterpret_cast<node_id>(static_cast<const void*>(&impl));
     archive.vectors = std::move(archive.vectors)
                           .set(vector_id,
-                               vector<T>{
-                                   .root   = root_id,
-                                   .tail   = tail_id,
-                                   .size   = impl.size,
-                                   .shift  = impl.shift,
+                               vector_save<T>{
+                                   .rbts =
+                                       rbts_info{
+                                           .root  = root_id,
+                                           .tail  = tail_id,
+                                           .size  = impl.size,
+                                           .shift = impl.shift,
+                                       },
                                    .vector = std::move(vec),
                                });
 
@@ -263,11 +266,14 @@ archive_save<T> save_vector(flex_vector_one<T> vec, archive_save<T> archive)
         reinterpret_cast<node_id>(static_cast<const void*>(&impl));
     archive.flex_vectors = std::move(archive.flex_vectors)
                                .set(vector_id,
-                                    flex_vector<T>{
-                                        .root   = root_id,
-                                        .tail   = tail_id,
-                                        .size   = impl.size,
-                                        .shift  = impl.shift,
+                                    flex_vector_save<T>{
+                                        .rbts =
+                                            rbts_info{
+                                                .root  = root_id,
+                                                .tail  = tail_id,
+                                                .size  = impl.size,
+                                                .shift = impl.shift,
+                                            },
                                         .vector = std::move(vec),
                                     });
 

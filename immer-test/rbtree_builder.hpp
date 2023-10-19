@@ -8,25 +8,71 @@ namespace immer_archive {
 template <class T,
           typename MemoryPolicy         = immer::default_memory_policy,
           immer::detail::rbts::bits_t B = immer::default_bits>
-struct loader
+class loader
 {
+public:
     static constexpr auto BL = immer::detail::rbts::bits_t{1};
     using rbtree = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
     using node_t = typename rbtree::node_t;
 
-    const archive_load<T> ar;
-    immer::map<node_id, node_t*> leaves;
-    immer::map<node_id, node_t*> strict_inners;
-    immer::map<node_id, node_t*> relaxed_inners;
+    explicit loader(archive_load<T> ar)
+        : ar_{std::move(ar)}
+    {
+    }
 
+    std::optional<vector_one<T, MemoryPolicy, B>> load_vector(node_id id)
+    {
+        auto* info = ar_.vectors.find(id);
+        if (!info) {
+            return std::nullopt;
+        }
+
+        // auto b = builder{info->size, info->shift};
+        // b.build();
+
+        auto* root = load_strict(info->rbts.root);
+        auto* tail = load_leaf(info->rbts.tail);
+        assert(root);
+        assert(tail);
+        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{};
+        // XXX add a way to construct it directly, this will lead to memory leak
+        impl.size  = info->rbts.size;
+        impl.shift = info->rbts.shift;
+        impl.root  = root;
+        impl.tail  = tail;
+        return vector_one<T, MemoryPolicy, B>{std::move(impl)};
+    }
+
+    std::optional<flex_vector_one<T, MemoryPolicy, B>>
+    load_flex_vector(node_id id)
+    {
+        auto* info = ar_.flex_vectors.find(id);
+        if (!info) {
+            return std::nullopt;
+        }
+
+        auto* root = load_some_node(info->rbts.root);
+        auto* tail = load_leaf(info->rbts.tail);
+        assert(root);
+        assert(tail);
+        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{};
+        // XXX add a way to construct it directly, this will lead to memory leak
+        impl.size  = info->rbts.size;
+        impl.shift = info->rbts.shift;
+        impl.root  = root;
+        impl.tail  = tail;
+        return vector_one<T, MemoryPolicy, B>{std::move(impl)};
+    }
+
+private:
     node_t* load_leaf(node_id id)
     {
-        if (auto* p = leaves.find(id)) {
+        if (auto* p = leaves_.find(id)) {
             node_t* node = *p;
             return node->inc();
         }
 
-        auto* node_info = ar.leaves.find(id);
+        auto* node_info = ar_.leaves.find(id);
         if (!node_info) {
             return nullptr;
         }
@@ -42,18 +88,18 @@ struct loader
             IMMER_RETHROW;
         }
         // XXX inc here
-        leaves = std::move(leaves).set(id, leaf->inc());
+        leaves_ = std::move(leaves_).set(id, leaf->inc());
         return leaf;
     }
 
     node_t* load_strict(node_id id)
     {
-        if (auto* p = strict_inners.find(id)) {
+        if (auto* p = strict_inners_.find(id)) {
             node_t* node = *p;
             return node->inc();
         }
 
-        auto* node_info = ar.inners.find(id);
+        auto* node_info = ar_.inners.find(id);
         if (!node_info) {
             return nullptr;
         }
@@ -77,19 +123,19 @@ struct loader
             IMMER_RETHROW;
         }
         // XXX inc
-        strict_inners = std::move(strict_inners).set(id, inner->inc());
+        strict_inners_ = std::move(strict_inners_).set(id, inner->inc());
 
         return inner;
     }
 
     node_t* load_relaxed(node_id id)
     {
-        if (auto* p = relaxed_inners.find(id)) {
+        if (auto* p = relaxed_inners_.find(id)) {
             node_t* node = *p;
             return node->inc();
         }
 
-        auto* node_info = ar.relaxed_inners.find(id);
+        auto* node_info = ar_.relaxed_inners.find(id);
         if (!node_info) {
             return nullptr;
         }
@@ -116,7 +162,7 @@ struct loader
             IMMER_RETHROW;
         }
         // XXX inc
-        strict_inners = std::move(strict_inners).set(id, relaxed->inc());
+        relaxed_inners_ = std::move(relaxed_inners_).set(id, relaxed->inc());
 
         return relaxed;
     }
@@ -124,75 +170,23 @@ struct loader
     node_t* load_some_node(node_id id)
     {
         // Unknown type: leaf, inner or relaxed
-        if (ar.leaves.count(id)) {
+        if (ar_.leaves.count(id)) {
             return load_leaf(id);
         }
-        if (ar.inners.count(id)) {
+        if (ar_.inners.count(id)) {
             return load_strict(id);
         }
-        if (ar.relaxed_inners.count(id)) {
+        if (ar_.relaxed_inners.count(id)) {
             return load_relaxed(id);
         }
         return nullptr;
     }
 
-    std::optional<vector_one<T, MemoryPolicy, B>> load_vector(node_id id)
-    {
-        auto* info = ar.vectors.find(id);
-        if (!info) {
-            return std::nullopt;
-        }
-
-        // auto b = builder{info->size, info->shift};
-        // b.build();
-
-        auto* root = load_strict(info->root);
-        auto* tail = load_leaf(info->tail);
-        assert(root);
-        assert(tail);
-        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{};
-        // XXX add a way to construct it directly, this will lead to memory leak
-        impl.size  = info->size;
-        impl.shift = info->shift;
-        impl.root  = root;
-        impl.tail  = tail;
-        return vector_one<T, MemoryPolicy, B>{std::move(impl)};
-    }
-
-    std::optional<flex_vector_one<T, MemoryPolicy, B>>
-    load_flex_vector(node_id id)
-    {
-        auto* info = ar.flex_vectors.find(id);
-        if (!info) {
-            return std::nullopt;
-        }
-
-        auto* root = load_some_node(info->root);
-        auto* tail = load_leaf(info->tail);
-        assert(root);
-        assert(tail);
-        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{};
-        // XXX add a way to construct it directly, this will lead to memory leak
-        impl.size  = info->size;
-        impl.shift = info->shift;
-        impl.root  = root;
-        impl.tail  = tail;
-        return vector_one<T, MemoryPolicy, B>{std::move(impl)};
-    }
-
-    std::size_t get_count(node_id id)
-    {
-        if (auto* p = ar.leaves.find(id)) {
-            return p->data.size();
-        }
-        if (auto* p = ar.inners.find(id)) {
-            return p->children.size();
-        }
-        if (auto* p = ar.relaxed_inners.find(id)) {
-            return p->children.size();
-        }
-        return 0;
-    }
+private:
+    const archive_load<T> ar_;
+    immer::map<node_id, node_t*> leaves_;
+    immer::map<node_id, node_t*> strict_inners_;
+    immer::map<node_id, node_t*> relaxed_inners_;
 };
 
 } // namespace immer_archive

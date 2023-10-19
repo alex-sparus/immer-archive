@@ -57,45 +57,59 @@ struct relaxed_inner_node
     immer::vector<relaxed_child> children;
 };
 
-template <class T>
-struct vector
+struct rbts_info
 {
     node_id root;
     node_id tail;
     std::size_t size;
     immer::detail::rbts::shift_t shift;
+};
 
+template <class T>
+struct vector_save
+{
+    rbts_info rbts;
     // Saving the archived vector, so that no mutations are allowed to happen.
     vector_one<T> vector;
 };
 
 template <class T>
-struct flex_vector
+struct vector_load
 {
-    node_id root;
-    node_id tail;
-    std::size_t size;
-    immer::detail::rbts::shift_t shift;
+    rbts_info rbts;
+};
 
+template <class T>
+struct flex_vector_save
+{
+    rbts_info rbts;
     // Saving the archived vector, so that no mutations are allowed to happen.
     flex_vector_one<T> vector;
 };
 
-template <class T, class Leaf>
+template <class T>
+struct flex_vector_load
+{
+    rbts_info rbts;
+};
+
+template <class T, class Leaf, class Vector, class FlexVector>
 struct archive
 {
     immer::map<node_id, Leaf> leaves;
     immer::map<node_id, inner_node> inners;
     immer::map<node_id, relaxed_inner_node> relaxed_inners;
-    immer::map<node_id, vector<T>> vectors;
-    immer::map<node_id, flex_vector<T>> flex_vectors;
+    immer::map<node_id, Vector> vectors;
+    immer::map<node_id, FlexVector> flex_vectors;
 };
 
 template <class T>
-using archive_load = archive<T, leaf_node_load<T>>;
+using archive_load =
+    archive<T, leaf_node_load<T>, vector_load<T>, flex_vector_load<T>>;
 
 template <class T>
-using archive_save = archive<T, leaf_node_save<T>>;
+using archive_save =
+    archive<T, leaf_node_save<T>, vector_save<T>, flex_vector_save<T>>;
 
 // This is needed to be able to use the archive that was not read from JSON
 // because .data is set only while reading from JSON.
@@ -113,10 +127,29 @@ archive_load<T> fix_leaf_nodes(archive_save<T> ar)
         leaves = std::move(leaves).set(item.first, leaf);
     }
 
+    auto vectors = immer::map<node_id, vector_load<T>>{};
+    for (const auto& [id, info] : ar.vectors) {
+        vectors = std::move(vectors).set(id,
+                                         vector_load<T>{
+                                             .rbts = info.rbts,
+                                         });
+    }
+
+    auto flex_vectors = immer::map<node_id, flex_vector_load<T>>{};
+    for (const auto& [id, info] : ar.flex_vectors) {
+        flex_vectors = std::move(flex_vectors)
+                           .set(id,
+                                flex_vector_load<T>{
+                                    .rbts = info.rbts,
+                                });
+    }
+
     return {
-        .leaves  = std::move(leaves),
-        .inners  = std::move(ar.inners),
-        .vectors = std::move(ar.vectors),
+        .leaves         = std::move(leaves),
+        .inners         = std::move(ar.inners),
+        .relaxed_inners = std::move(ar.relaxed_inners),
+        .vectors        = std::move(vectors),
+        .flex_vectors   = std::move(flex_vectors),
     };
 }
 
@@ -171,8 +204,18 @@ void serialize(Archive& ar, relaxed_inner_node& value)
     ar(CEREAL_NVP(children));
 }
 
-template <class Archive, class T>
-void serialize(Archive& ar, vector<T>& value)
+template <class Archive>
+void save(Archive& ar, const rbts_info& value)
+{
+    auto& root  = value.root;
+    auto& tail  = value.tail;
+    auto& size  = value.size;
+    auto& shift = value.shift;
+    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(size), CEREAL_NVP(shift));
+}
+
+template <class Archive>
+void load(Archive& ar, rbts_info& value)
 {
     auto& root  = value.root;
     auto& tail  = value.tail;
@@ -182,17 +225,31 @@ void serialize(Archive& ar, vector<T>& value)
 }
 
 template <class Archive, class T>
-void serialize(Archive& ar, flex_vector<T>& value)
+void save(Archive& ar, const vector_save<T>& value)
 {
-    auto& root  = value.root;
-    auto& tail  = value.tail;
-    auto& size  = value.size;
-    auto& shift = value.shift;
-    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(size), CEREAL_NVP(shift));
+    save(ar, value.rbts);
 }
 
-template <class Archive, class T, class Leaf>
-void serialize(Archive& ar, archive<T, Leaf>& value)
+template <class Archive, class T>
+void load(Archive& ar, vector_load<T>& value)
+{
+    load(ar, value.rbts);
+}
+
+template <class Archive, class T>
+void save(Archive& ar, const flex_vector_save<T>& value)
+{
+    save(ar, value.rbts);
+}
+
+template <class Archive, class T>
+void load(Archive& ar, flex_vector_load<T>& value)
+{
+    load(ar, value.rbts);
+}
+
+template <class Archive, class... T>
+void serialize(Archive& ar, archive<T...>& value)
 {
     auto& leaves         = value.leaves;
     auto& inners         = value.inners;
