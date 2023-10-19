@@ -24,7 +24,7 @@
       '';
     in rec {
       devShell = pkgs.mkShell.override {stdenv = pkgs.llvmPackages_14.stdenv;} {
-        packages = with pkgs; [clang-format cmake ninja spdlog cereal fmt_9];
+        packages = with pkgs; [clang-format cmake ninja spdlog cereal fmt_9 catch2_3];
       };
     });
 }

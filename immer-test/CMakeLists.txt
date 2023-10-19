@@ -10,12 +10,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(spdlog REQUIRED)
 find_package(cereal REQUIRED)
+find_package(Catch2 REQUIRED)
 
 add_compile_definitions(SPDLOG_ACTIVE_LEVEL TRACE)
 
 add_executable(MyExample main.cpp)
 target_include_directories(MyExample PRIVATE immer .)
-target_link_libraries(MyExample PRIVATE spdlog::spdlog)
+target_link_libraries(MyExample PRIVATE spdlog::spdlog Catch2::Catch2WithMain)
 
 # ninja && ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=suppressions=../suppr.txt ./MyExample
 target_compile_options(MyExample PRIVATE
