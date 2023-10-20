@@ -27,6 +27,7 @@
       devShell = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
         packages = with pkgs; [
           clang-format
+          cmake-format
           cmake
           ninja
           spdlog
