@@ -22,9 +22,22 @@
         mkdir -p $out/bin
         ln -s ${pkgs.llvmPackages_16.clang-unwrapped}/bin/clang-format $out/bin/
       '';
+      our_llvm = pkgs.llvmPackages_14;
     in rec {
-      devShell = pkgs.mkShell.override {stdenv = pkgs.llvmPackages_14.stdenv;} {
-        packages = with pkgs; [clang-format cmake ninja spdlog cereal fmt_9 catch2_3];
+      devShell = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
+        packages = with pkgs; [
+          clang-format
+          cmake
+          ninja
+          spdlog
+          cereal
+          fmt_9
+          catch2_3
+
+          # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
+          our_llvm.bintools-unwrapped
+        ];
       };
+      qwe = pkgs;
     });
 }

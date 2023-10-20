@@ -7,6 +7,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 
@@ -50,13 +51,13 @@ T from_json(std::string input)
 }
 
 std::vector<immer_archive::archive_load<int>>
-load_archive(std::string_view filename)
+load_archive(const std::filesystem::path& filename)
 {
     const auto open = [&] {
         auto is = std::ifstream{filename};
         if (!is) {
             throw std::runtime_error{
-                fmt::format("Failed to read from {}", filename)};
+                fmt::format("Failed to read from {}", filename.c_str())};
         }
         return is;
     };
@@ -89,11 +90,12 @@ auto load(auto name)
     return load_archive(prefix + name);
 }
 
-void save_to_file(std::string_view filename, std::string_view data)
+void save_to_file(const std::filesystem::path& filename, std::string_view data)
 {
     auto os = std::ofstream{filename};
     if (!os) {
-        throw std::runtime_error{fmt::format("Failed to save to {}", filename)};
+        throw std::runtime_error{
+            fmt::format("Failed to save to {}", filename.c_str())};
     }
     os.write(data.data(), data.size());
 }

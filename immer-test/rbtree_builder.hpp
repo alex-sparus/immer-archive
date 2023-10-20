@@ -1,6 +1,7 @@
 #pragma once
 
 #include <immer/detail/rbts/node.hpp>
+#include <optional>
 
 namespace immer_archive {
 
