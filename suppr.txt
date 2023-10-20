@@ -3,3 +3,5 @@ leak:class_rw_t::extAlloc
 leak:logger.h
 leak:cache_t::insert
 leak:realizeClassWithoutSwift
+leak:cereal::JSONInputArchive::Iterator::search
+# leak:void* immer::detail::unsafe_free_list_heap_impl<immer::detail::thread_local_free_list_storage

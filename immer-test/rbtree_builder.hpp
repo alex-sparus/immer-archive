@@ -149,10 +149,8 @@ private:
         }
 
         const auto n = node_info->data.size();
-        auto leaf    = node_ptr{node_t::make_leaf_n(n), [n](auto* ptr) {
-                                 node_t::heap::deallocate(
-                                     node_t::sizeof_leaf_n(n), ptr);
-                             }};
+        auto leaf    = node_ptr{node_t::make_leaf_n(n),
+                             [n](auto* ptr) { node_t::delete_leaf(ptr, n); }};
         immer::detail::uninitialized_copy(
             node_info->data.begin(), node_info->data.end(), leaf.get()->leaf());
         leaves_ = std::move(leaves_).set(id, leaf);

@@ -199,10 +199,14 @@ TEST_CASE("Saving flex_vectors")
 
 TEST_CASE("Save and load multiple times into the same archive")
 {
-    auto test_vectors = std::vector<example_vector>{// gen(example_vector{}, 67)
-                                                    example_vector{}};
-    auto counter      = std::size_t{};
-    auto ar           = immer_archive::archive_save<int>{};
+    spdlog::set_level(spdlog::level::trace);
+
+    auto test_vectors = std::vector<example_vector>{
+        // gen(example_vector{}, 4)
+        example_vector{},
+    };
+    auto counter             = std::size_t{};
+    auto ar                  = immer_archive::archive_save<int>{};
     const auto save_and_load = [&]() {
         const auto vec = test_vectors.back().push_back(++counter);
         test_vectors.push_back(vec);
@@ -210,20 +214,24 @@ TEST_CASE("Save and load multiple times into the same archive")
         auto vector_id          = immer_archive::node_id{};
         std::tie(ar, vector_id) = immer_archive::save_vector(vec, ar);
 
-        auto loader     = immer_archive::loader<int>{fix_leaf_nodes(ar)};
-        auto loaded_vec = loader.load_vector(vector_id);
-        REQUIRE(loaded_vec.has_value());
-        REQUIRE(*loaded_vec == vec);
-
-        // save it again, causing the full traversal and crash
-        // SPDLOG_DEBUG("size = {}", size);
-        // SPDLOG_DEBUG("vec = {}", to_json(loaded_vec.value()));
-        // auto ar2 = immer_archive::save_vector(loaded_vec.value(), {});
-        // SPDLOG_DEBUG("ar = {}, ar2 = {}", to_json(ar), to_json(ar2));
+        SPDLOG_DEBUG("start test size {}", vec.size());
+        {
+            auto loader = std::make_optional(
+                immer_archive::loader<int>{fix_leaf_nodes(ar)});
+            auto loaded_vec = loader->load_vector(vector_id);
+            REQUIRE(loaded_vec.has_value());
+            REQUIRE(*loaded_vec == vec);
+        }
+        SPDLOG_DEBUG("end test size {}", vec.size());
     };
-    for (int i = 0; i < 10; ++i) {
-        save_and_load();
-    }
+    // Memory leak investigation: starts only with 4 iterations.
+    // for (int i = 0; i < 4; ++i) {
+    //     save_and_load();
+    // }
+    save_and_load();
+    save_and_load();
+    save_and_load();
+    save_and_load();
 }
 
 TEST_CASE("Read vectors")
