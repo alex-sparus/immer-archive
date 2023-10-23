@@ -434,3 +434,45 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
     loaded = {};
     // Now the loader should deallocated all the nodes it has.
 }
+
+TEST_CASE("Archive in-place mutated vector")
+{
+    auto vec          = example_vector{1, 2, 3};
+    auto ar           = immer_archive::archive_save<int>{};
+    auto id1          = immer_archive::node_id{};
+    std::tie(ar, id1) = save_vector(vec, ar);
+
+    vec               = std::move(vec).push_back(90);
+    auto id2          = immer_archive::node_id{};
+    std::tie(ar, id2) = save_vector(vec, ar);
+
+    REQUIRE(id1 != id2);
+
+    auto loader        = immer_archive::loader<int>{fix_leaf_nodes(ar)};
+    const auto loaded1 = loader.load_vector(id1);
+    const auto loaded2 = loader.load_vector(id2);
+    REQUIRE(loaded1.has_value());
+    REQUIRE(loaded2.has_value());
+    REQUIRE(*loaded2 == loaded1->push_back(90));
+}
+
+TEST_CASE("Archive in-place mutated flex_vector")
+{
+    auto vec          = example_flex_vector{1, 2, 3};
+    auto ar           = immer_archive::archive_save<int>{};
+    auto id1          = immer_archive::node_id{};
+    std::tie(ar, id1) = save_vector(vec, ar);
+
+    vec               = std::move(vec).push_back(90);
+    auto id2          = immer_archive::node_id{};
+    std::tie(ar, id2) = save_vector(vec, ar);
+
+    REQUIRE(id1 != id2);
+
+    auto loader        = immer_archive::loader<int>{fix_leaf_nodes(ar)};
+    const auto loaded1 = loader.load_flex_vector(id1);
+    const auto loaded2 = loader.load_flex_vector(id2);
+    REQUIRE(loaded1.has_value());
+    REQUIRE(loaded2.has_value());
+    REQUIRE(*loaded2 == loaded1->push_back(90));
+}
