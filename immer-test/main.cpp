@@ -51,13 +51,12 @@ T from_json(std::string input)
 }
 
 std::vector<immer_archive::archive_load<int>>
-load_archive(const std::filesystem::path& filename)
+load_archive(const std::string& filename)
 {
     const auto open = [&] {
         auto is = std::ifstream{filename};
         if (!is) {
-            throw std::runtime_error{
-                fmt::format("Failed to read from {}", filename.c_str())};
+            throw std::runtime_error{"Failed to read from " + filename};
         }
         return is;
     };
@@ -81,7 +80,7 @@ load_archive(const std::filesystem::path& filename)
     }
 }
 
-auto load(auto name)
+auto load(const std::string& name)
 {
     const bool xcode = false;
     SPDLOG_DEBUG("loading {}", name);
@@ -199,7 +198,7 @@ TEST_CASE("Saving flex_vectors")
 
 TEST_CASE("Save and load multiple times into the same archive")
 {
-    spdlog::set_level(spdlog::level::trace);
+    // spdlog::set_level(spdlog::level::trace);
 
     auto test_vectors = std::vector<example_vector>{
         // gen(example_vector{}, 4)
@@ -261,7 +260,7 @@ TEST_CASE("Read vectors")
 
 TEST_CASE("Read flex vectors")
 {
-    const auto check_file = [&](auto name) {
+    const auto check_file = [&](const std::string& name) {
         const auto archives = load(name);
         for (const auto& ar : archives) {
             auto loader = immer_archive::loader<int>{ar};

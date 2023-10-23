@@ -5,7 +5,83 @@
 
 namespace immer_archive {
 
-// XXX: Ignoring ref counting completely for now, memory will leak
+template <typename Node>
+class node_ptr
+{
+public:
+    node_ptr(Node* ptr_, std::function<void(Node* ptr)> deleter_)
+        : ptr{ptr_}
+        , deleter{std::move(deleter_)}
+    {
+        SPDLOG_TRACE("ctor {} with ptr {}", (void*) this, (void*) ptr);
+        // Assuming the node has just been created and not calling inc() on
+        // it.
+    }
+
+    node_ptr(std::nullptr_t)
+        : ptr{nullptr}
+    {
+    }
+
+    node_ptr(const node_ptr& other)
+        : ptr{other.ptr}
+        , deleter{other.deleter}
+    {
+        SPDLOG_TRACE("copy ctor {} from {}", (void*) this, (void*) &other);
+        if (ptr) {
+            ptr->inc();
+        }
+    }
+
+    node_ptr(node_ptr&& other)
+        : ptr{other.release()}
+        , deleter{other.deleter}
+    {
+        SPDLOG_TRACE("move ctor {} from {}", (void*) this, (void*) &other);
+    }
+
+    node_ptr& operator=(node_ptr&& other)
+    {
+        SPDLOG_TRACE("move assign {} = {}", (void*) this, (void*) &other);
+        auto temp = node_ptr{std::move(other)};
+        using std::swap;
+        swap(ptr, temp.ptr);
+        swap(deleter, temp.deleter);
+        return *this;
+    }
+
+    ~node_ptr()
+    {
+        SPDLOG_TRACE("dtor {}", (void*) this);
+        if (ptr && ptr->dec()) {
+            SPDLOG_TRACE("calling deleter for {}", (void*) ptr);
+            deleter(ptr);
+        }
+    }
+
+    operator bool() const { return ptr; }
+
+    Node* release()
+    {
+        auto result = ptr;
+        ptr         = nullptr;
+        return result;
+    }
+
+    Node* get() { return ptr; }
+
+private:
+    Node* ptr;
+    std::function<void(Node* ptr)> deleter;
+};
+
+template <typename Node>
+struct inner_node_ptr
+{
+    node_ptr<Node> node;
+    immer::vector<node_ptr<Node>> children;
+};
+
 template <class T,
           typename MemoryPolicy         = immer::default_memory_policy,
           immer::detail::rbts::bits_t B = immer::default_bits>
@@ -13,8 +89,10 @@ class loader
 {
 public:
     static constexpr auto BL = immer::detail::rbts::bits_t{1};
-    using rbtree = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
-    using node_t = typename rbtree::node_t;
+    using rbtree         = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
+    using node_t         = typename rbtree::node_t;
+    using node_ptr       = node_ptr<node_t>;
+    using inner_node_ptr = inner_node_ptr<node_t>;
 
     explicit loader(archive_load<T> ar)
         : ar_{std::move(ar)}
@@ -36,7 +114,9 @@ public:
         assert(root);
         assert(tail);
         auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{};
-        // XXX add a way to construct it directly, this will lead to memory leak
+        // XXX Hack: destroy the empty tree to later replace all the members.
+        // XXX add a way to construct it directly.
+        impl.dec();
         impl.size  = info->rbts.size;
         impl.shift = info->rbts.shift;
         impl.root  = root.release();
@@ -64,79 +144,10 @@ public:
         impl.shift = info->rbts.shift;
         impl.root  = root.release();
         impl.tail  = tail.release();
-        return vector_one<T, MemoryPolicy, B>{std::move(impl)};
+        return flex_vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
 private:
-    class node_ptr
-    {
-    private:
-        node_t* ptr;
-        std::function<void(node_t* ptr)> deleter;
-
-    public:
-        node_ptr(node_t* ptr_, std::function<void(node_t* ptr)> deleter_)
-            : ptr{ptr_}
-            , deleter{std::move(deleter_)}
-        {
-            SPDLOG_TRACE("ctor {} with ptr {}", (void*) this, (void*) ptr);
-            // Assuming the node has just been created and not calling inc() on
-            // it.
-        }
-
-        node_ptr(std::nullptr_t)
-            : ptr{nullptr}
-        {
-        }
-
-        node_ptr(const node_ptr& other)
-            : ptr{other.ptr}
-            , deleter{other.deleter}
-        {
-            SPDLOG_TRACE("copy ctor {} from {}", (void*) this, (void*) &other);
-            if (ptr) {
-                ptr->inc();
-            }
-        }
-
-        node_ptr(node_ptr&& other)
-            : ptr{other.release()}
-            , deleter{other.deleter}
-        {
-            SPDLOG_TRACE("move ctor {} from {}", (void*) this, (void*) &other);
-        }
-
-        node_ptr& operator=(node_ptr&& other)
-        {
-            SPDLOG_TRACE("move assign {} = {}", (void*) this, (void*) &other);
-            auto temp = node_ptr{std::move(other)};
-            using std::swap;
-            swap(ptr, temp.ptr);
-            swap(deleter, temp.deleter);
-            return *this;
-        }
-
-        ~node_ptr()
-        {
-            SPDLOG_TRACE("dtor {}", (void*) this);
-            if (ptr && ptr->dec()) {
-                SPDLOG_TRACE("calling deleter for {}", (void*) ptr);
-                deleter(ptr);
-            }
-        }
-
-        operator bool() const { return ptr; }
-
-        node_t* release()
-        {
-            auto result = ptr;
-            ptr         = nullptr;
-            return result;
-        }
-
-        node_t* get() { return ptr; }
-    };
-
     node_ptr load_leaf(node_id id)
     {
         if (auto* p = leaves_.find(id)) {
@@ -159,8 +170,8 @@ private:
 
     node_ptr load_strict(node_id id)
     {
-        if (auto* p = strict_inners_.find(id)) {
-            return *p;
+        if (auto* p = inners_.find(id)) {
+            return p->node;
         }
 
         auto* node_info = ar_.inners.find(id);
@@ -168,28 +179,34 @@ private:
             return nullptr;
         }
 
-        const auto n = node_info->children.size();
-        auto inner   = node_ptr{node_t::make_inner_n(n),
+        const auto n  = node_info->children.size();
+        auto inner    = node_ptr{node_t::make_inner_n(n),
                               [n](auto* ptr) { node_t::delete_inner(ptr, n); }};
-
-        auto index = std::size_t{};
+        auto children = immer::vector<node_ptr>{};
+        auto index    = std::size_t{};
         for (const auto& child_node_id : node_info->children) {
             auto child = load_some_node(child_node_id);
             if (!child) {
                 throw std::invalid_argument{
                     fmt::format("Failed to load node ID {}", child_node_id)};
             }
-            inner.get()->inner()[index] = child.release();
+            auto* raw_ptr = child.get();
+            children      = std::move(children).push_back(std::move(child));
+            inner.get()->inner()[index] = raw_ptr;
             ++index;
         }
-        strict_inners_ = std::move(strict_inners_).set(id, inner);
+        inners_ = std::move(inners_).set(id,
+                                         inner_node_ptr{
+                                             .node     = inner,
+                                             .children = std::move(children),
+                                         });
         return inner;
     }
 
     node_ptr load_relaxed(node_id id)
     {
-        if (auto* p = relaxed_inners_.find(id)) {
-            return *p;
+        if (auto* p = inners_.find(id)) {
+            return p->node;
         }
 
         auto* node_info = ar_.relaxed_inners.find(id);
@@ -202,6 +219,7 @@ private:
                                     node_t::delete_inner_r(ptr, n);
                                 }};
         relaxed.get()->relaxed()->d.count = n;
+        auto children                     = immer::vector<node_ptr>{};
         auto index                        = std::size_t{};
         for (const auto& [child_node_id, child_size] : node_info->children) {
             auto child = load_some_node(child_node_id);
@@ -209,11 +227,17 @@ private:
                 throw std::invalid_argument{
                     fmt::format("Failed to load node ID {}", child_node_id)};
             }
-            relaxed.get()->inner()[index]            = child.release();
+            auto* raw_ptr = child.get();
+            children      = std::move(children).push_back(std::move(child));
+            relaxed.get()->inner()[index]            = raw_ptr;
             relaxed.get()->relaxed()->d.sizes[index] = child_size;
             ++index;
         }
-        relaxed_inners_ = std::move(relaxed_inners_).set(id, relaxed);
+        inners_ = std::move(inners_).set(id,
+                                         inner_node_ptr{
+                                             .node     = relaxed,
+                                             .children = std::move(children),
+                                         });
         return relaxed;
     }
 
@@ -235,8 +259,7 @@ private:
 private:
     const archive_load<T> ar_;
     immer::map<node_id, node_ptr> leaves_;
-    immer::map<node_id, node_ptr> strict_inners_;
-    immer::map<node_id, node_ptr> relaxed_inners_;
+    immer::map<node_id, inner_node_ptr> inners_;
 };
 
 } // namespace immer_archive
