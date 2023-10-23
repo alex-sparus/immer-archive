@@ -230,7 +230,7 @@ TEST_CASE("Read flex vectors")
                 REQUIRE(vec.value().impl().check_tree());
 
                 // Iterate over the whole read vector, just to test.
-                auto test = example_vector{};
+                auto test = example_flex_vector{};
                 for (int i : vec.value()) {
                     test = std::move(test).push_back(i);
                 }
