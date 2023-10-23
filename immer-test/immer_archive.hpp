@@ -1,11 +1,13 @@
 #pragma once
 
 #include <immer/array.hpp>
+#include <immer/flex_vector.hpp>
 #include <immer/map.hpp>
 #include <immer/vector.hpp>
 
 #include <cereal/cereal.hpp>
 
+#include <bnz/immer_map.hpp>
 #include <bnz/immer_vector.hpp>
 
 namespace immer_archive {

@@ -13,42 +13,11 @@
 
 #include "immer_save.hpp"
 #include "rbtree_builder.hpp"
+#include <test/utils.hpp>
 
 #include <spdlog/spdlog.h>
 
-#include <bnz/immer_map.hpp>
-#include <bnz/immer_vector.hpp>
-#include <cereal/archives/json.hpp>
-#include <cereal/cereal.hpp>
-#include <cereal/types/vector.hpp>
-
-#include <immer/algorithm.hpp>
-#include <immer/flex_vector.hpp>
-#include <immer/map.hpp>
-#include <immer/vector.hpp>
-
 namespace {
-
-template <typename T>
-std::string to_json(const T& serializable)
-{
-    auto os = std::ostringstream{};
-    {
-        auto ar = cereal::JSONOutputArchive{os};
-        ar(serializable);
-    }
-    return os.str();
-}
-
-template <typename T>
-T from_json(std::string input)
-{
-    auto is = std::istringstream{input};
-    auto ar = cereal::JSONInputArchive{is};
-    auto r  = T{};
-    ar(r);
-    return r;
-}
 
 std::vector<immer_archive::archive_load<int>>
 load_archive(const std::string& filename)
@@ -99,18 +68,10 @@ void save_to_file(const std::filesystem::path& filename, std::string_view data)
     os.write(data.data(), data.size());
 }
 
-using example_vector      = immer_archive::vector_one<int>;
-using example_flex_vector = immer_archive::flex_vector_one<int>;
-using immer_archive::save_vector;
-
-const auto gen = [](auto init, int count) {
-    for (int i = 0; i < count; ++i) {
-        init = std::move(init).push_back(i);
-    }
-    return init;
-};
-
 } // namespace
+
+using namespace test;
+using immer_archive::save_vector;
 
 TEST_CASE("Saving vectors")
 {

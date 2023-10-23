@@ -1,7 +1,11 @@
 #pragma once
 
-#include <immer/detail/rbts/node.hpp>
+#include <immer_archive.hpp>
+
+#include <immer/vector.hpp>
 #include <optional>
+
+#include <spdlog/spdlog.h>
 
 namespace immer_archive {
 
