@@ -124,9 +124,7 @@ to_json_with_archive(const T& serializable)
     auto archives = archives_save{};
     auto os       = std::ostringstream{};
     {
-        auto ar = immer_archive::with_archives_adapter_save<
-            archives_save,
-            cereal::JSONOutputArchive>{os};
+        auto ar = immer_archive::with_archives_adapter_save<archives_save>{os};
         ar(serializable);
         archives = ar.get_archives();
     }
