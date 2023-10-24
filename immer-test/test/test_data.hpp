@@ -3,6 +3,13 @@
 #include <rbtree_builder.hpp>
 #include <with_archive.hpp>
 
+/**
+ * This approach is using the standard JSONOutputArchive and does some special
+ * handling in-between.
+ *
+ * Doesn't seem to be a good approach.
+ */
+
 namespace test {
 
 struct info

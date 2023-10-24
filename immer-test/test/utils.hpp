@@ -1,5 +1,7 @@
 #pragma once
 
+#include <immer_archive.hpp>
+
 #include <sstream>
 
 #include <cereal/archives/json.hpp>

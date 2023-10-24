@@ -1,5 +1,13 @@
 #pragma once
 
+#include <cereal/archives/json.hpp>
+
+/**
+ * Special types of archives, working with JSON, that support providing extra
+ * context (ImmerArchives) to serialize immer data structures using
+ * immer-archive.
+ */
+
 namespace immer_archive {
 
 /**

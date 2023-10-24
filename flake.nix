@@ -34,6 +34,7 @@
           cereal
           fmt_9
           catch2_3
+          boost
 
           # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
           our_llvm.bintools-unwrapped
