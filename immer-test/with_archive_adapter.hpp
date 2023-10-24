@@ -91,8 +91,6 @@ public:
     ~with_archives_adapter_save() { Archive::operator()(CEREAL_NVP(archives)); }
 
 private:
-    //! Overload the rtti function to enable dynamic_cast
-    void rtti() override {}
     friend ImmerArchives& get_archives_save<ImmerArchives>(Archive& ar);
 
 private:
@@ -104,15 +102,13 @@ class with_archives_adapter_load : public Archive
 {
 public:
     template <class... Args>
-    with_archives_adapter_load(Args&&... args)
+    with_archives_adapter_load(ImmerArchives archives_, Args&&... args)
         : Archive{std::forward<Args>(args)...}
+        , archives{std::move(archives_)}
     {
-        Archive::operator()(CEREAL_NVP(archives));
     }
 
 private:
-    //! Overload the rtti function to enable dynamic_cast
-    void rtti() override {}
     friend ImmerArchives& get_archives_load<ImmerArchives>(Archive& ar);
 
 private:

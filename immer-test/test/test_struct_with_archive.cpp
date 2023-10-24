@@ -55,25 +55,39 @@ struct test_data
 };
 
 template <typename T>
-std::string to_json_with_archive(const T& serializable)
+std::pair<std::string, immer_archive::archives_save>
+to_json_with_archive(const T& serializable)
 {
-    auto os = std::ostringstream{};
+    auto archives = immer_archive::archives_save{};
+    auto os       = std::ostringstream{};
     {
         auto ar = immer_archive::with_archives_adapter_save<
             immer_archive::archives_save,
             cereal::JSONOutputArchive>{os};
         ar(serializable);
+        cereal::JSONOutputArchive& ref = ar;
+        archives =
+            immer_archive::get_archives_save<immer_archive::archives_save>(ref);
     }
-    return os.str();
+    return {os.str(), archives};
 }
 
 template <typename T>
-T from_json_with_archive(std::string input)
+T from_json_with_archive(const std::string& input)
 {
+    const auto archives = [&input] {
+        auto is       = std::istringstream{input};
+        auto ar       = cereal::JSONInputArchive{is};
+        auto archives = immer_archive::archives_load{};
+        ar(CEREAL_NVP(archives));
+        return archives;
+    }();
+
     auto is = std::istringstream{input};
     auto ar =
         immer_archive::with_archives_adapter_load<immer_archive::archives_load,
-                                                  cereal::JSONInputArchive>{is};
+                                                  cereal::JSONInputArchive>{
+            archives, is};
     auto r = T{};
     ar(r);
     return r;
@@ -89,8 +103,30 @@ TEST_CASE("Save with a special archive")
         .strings = {"one", "two"},
     };
 
-    const auto json_str = to_json_with_archive(test1);
-//    REQUIRE(json_str == "");
+    const auto [json_str, archives] = to_json_with_archive(test1);
+    SECTION("Try to save and load the archive")
+    {
+        const auto archives_json = [&archives = archives] {
+            auto os = std::ostringstream{};
+            {
+                auto ar = cereal::JSONOutputArchive{os};
+                ar(123);
+                ar(CEREAL_NVP(archives));
+            }
+            return os.str();
+        }();
+        // REQUIRE(archives_json == "");
+        const auto archives_loaded = [&archives_json] {
+            auto is       = std::istringstream{archives_json};
+            auto ar       = cereal::JSONInputArchive{is};
+            auto archives = immer_archive::archives_load{};
+            ar(CEREAL_NVP(archives));
+            return archives;
+        }();
+        REQUIRE(archives_loaded.ints.leaves.size() == 2);
+    }
+
+    // REQUIRE(json_str == "");
 
     {
         auto full_load = from_json_with_archive<test_data>(json_str);
