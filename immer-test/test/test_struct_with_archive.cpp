@@ -54,20 +54,81 @@ struct test_data
     }
 };
 
+struct archives_save
+{
+    immer_archive::archive_save<int> ints;
+    immer_archive::archive_save<std::string> strings;
+
+    template <class Archive>
+    void save(Archive& ar) const
+    {
+        ar(CEREAL_NVP(ints), CEREAL_NVP(strings));
+    }
+};
+
+template <class T>
+immer_archive::archive_save<T>& get_save_archive(archives_save& ars);
+
+template <>
+immer_archive::archive_save<int>& get_save_archive(archives_save& ars)
+{
+    return ars.ints;
+}
+
+template <>
+immer_archive::archive_save<std::string>& get_save_archive(archives_save& ars)
+{
+    return ars.strings;
+}
+
+struct archives_load
+{
+    immer_archive::archive_load<int> ints;
+    immer_archive::archive_load<std::string> strings;
+
+    std::optional<immer_archive::loader<int>> int_loader;
+    std::optional<immer_archive::loader<std::string>> strings_loader;
+
+    template <class Archive>
+    void load(Archive& ar)
+    {
+        ar(CEREAL_NVP(ints), CEREAL_NVP(strings));
+    }
+};
+
+template <class T>
+immer_archive::loader<T>& get_loader(archives_load& ars);
+
+template <>
+immer_archive::loader<int>& get_loader(archives_load& ars)
+{
+    if (!ars.int_loader) {
+        ars.int_loader.emplace(ars.ints);
+    }
+    return *ars.int_loader;
+}
+
+template <>
+immer_archive::loader<std::string>& get_loader(archives_load& ars)
+{
+    if (!ars.strings_loader) {
+        ars.strings_loader.emplace(ars.strings);
+    }
+    return *ars.strings_loader;
+}
+
 template <typename T>
-std::pair<std::string, immer_archive::archives_save>
+std::pair<std::string, archives_save>
 to_json_with_archive(const T& serializable)
 {
-    auto archives = immer_archive::archives_save{};
+    auto archives = archives_save{};
     auto os       = std::ostringstream{};
     {
         auto ar = immer_archive::with_archives_adapter_save<
-            immer_archive::archives_save,
+            archives_save,
             cereal::JSONOutputArchive>{os};
         ar(serializable);
-        cereal::JSONOutputArchive& ref = ar;
-        archives =
-            immer_archive::get_archives_save<immer_archive::archives_save>(ref);
+        archives = ar.get_archives();
     }
     return {os.str(), archives};
 }
@@ -78,14 +139,14 @@ T from_json_with_archive(const std::string& input)
     const auto archives = [&input] {
         auto is       = std::istringstream{input};
         auto ar       = cereal::JSONInputArchive{is};
-        auto archives = immer_archive::archives_load{};
+        auto archives = archives_load{};
         ar(CEREAL_NVP(archives));
         return archives;
     }();
 
     auto is = std::istringstream{input};
     auto ar =
-        immer_archive::with_archives_adapter_load<immer_archive::archives_load,
+        immer_archive::with_archives_adapter_load<archives_load,
                                                   cereal::JSONInputArchive>{
             archives, is};
     auto r = T{};
@@ -119,14 +180,14 @@ TEST_CASE("Save with a special archive")
         const auto archives_loaded = [&archives_json] {
             auto is       = std::istringstream{archives_json};
             auto ar       = cereal::JSONInputArchive{is};
-            auto archives = immer_archive::archives_load{};
+            auto archives = archives_load{};
             ar(CEREAL_NVP(archives));
             return archives;
         }();
         REQUIRE(archives_loaded.ints.leaves.size() == 2);
     }
 
-    // REQUIRE(json_str == "");
+    REQUIRE(json_str == "");
 
     {
         auto full_load = from_json_with_archive<test_data>(json_str);
