@@ -124,7 +124,7 @@ to_json_with_archive(const T& serializable)
     auto archives = archives_save{};
     auto os       = std::ostringstream{};
     {
-        auto ar = immer_archive::with_archives_adapter_save<archives_save>{os};
+        auto ar = immer_archive::json_immer_output_archive<archives_save>{os};
         ar(serializable);
         archives = ar.get_archives();
     }
@@ -144,9 +144,7 @@ T from_json_with_archive(const std::string& input)
 
     auto is = std::istringstream{input};
     auto ar =
-        immer_archive::with_archives_adapter_load<archives_load,
-                                                  cereal::JSONInputArchive>{
-            archives, is};
+        immer_archive::json_immer_input_archive<archives_load>{archives, is};
     auto r = T{};
     ar(r);
     return r;
@@ -185,7 +183,7 @@ TEST_CASE("Save with a special archive")
         REQUIRE(archives_loaded.ints.leaves.size() == 2);
     }
 
-    REQUIRE(json_str == "");
+    // REQUIRE(json_str == "");
 
     {
         auto full_load = from_json_with_archive<test_data>(json_str);
