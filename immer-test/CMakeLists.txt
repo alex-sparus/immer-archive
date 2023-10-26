@@ -13,7 +13,7 @@ find_package(cereal REQUIRED)
 find_package(Catch2 REQUIRED)
 
 add_executable(MyExample main.cpp test/test_struct_with_archive.cpp
-                         test/test_special_archive.cpp)
+                         test/test_special_archive.cpp test/test_champ.cpp)
 target_include_directories(MyExample PRIVATE immer .)
 target_link_libraries(MyExample PRIVATE spdlog::spdlog Catch2::Catch2WithMain)
 

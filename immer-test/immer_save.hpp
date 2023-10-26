@@ -92,9 +92,9 @@ struct visitor_helper
 template <typename T, typename MemoryPolicy, immer::detail::rbts::bits_t B>
 std::pair<archive_save<T>, node_id>
 get_node_id(archive_save<T> ar,
-            immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
+            const immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
 {
-    auto* ptr_void = static_cast<void*>(ptr);
+    auto* ptr_void = static_cast<const void*>(ptr);
     if (auto* maybe_id = ar.node_ptr_to_id.find(ptr_void)) {
         auto id = *maybe_id;
         return {std::move(ar), id};

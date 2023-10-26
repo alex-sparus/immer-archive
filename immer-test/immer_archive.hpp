@@ -118,7 +118,7 @@ struct archive_save
     immer::map<node_id, flex_vector_save<T>> flex_vectors;
 
     immer::map<rbts_id, node_id> rbts_to_id;
-    immer::map<void*, node_id> node_ptr_to_id;
+    immer::map<const void*, node_id> node_ptr_to_id;
 };
 
 template <class T>
