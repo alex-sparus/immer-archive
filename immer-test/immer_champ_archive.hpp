@@ -1,10 +1,13 @@
 #pragma once
 
+#include <immer/array.hpp>
 #include <immer/map.hpp>
 #include <immer/set.hpp>
 #include <immer/vector.hpp>
 
 #include <cereal/cereal.hpp>
+
+#include <boost/endian/conversion.hpp>
 
 // #include <bnz/immer_map.hpp>
 // #include <bnz/immer_vector.hpp>
@@ -28,10 +31,31 @@ struct values_save
 };
 
 template <class T>
+struct values_load
+{
+    immer::array<T> data;
+};
+
+template <class T, immer::detail::hamts::bits_t B>
 struct inner_node_save
 {
+    using bitmap_t = typename immer::detail::hamts::get_bitmap_type<B>::type;
+
     values_save<T> values;
     immer::vector<node_id> children;
+    bitmap_t nodemap;
+    bitmap_t datamap;
+};
+
+template <class T, immer::detail::hamts::bits_t B>
+struct inner_node_load
+{
+    using bitmap_t = typename immer::detail::hamts::get_bitmap_type<B>::type;
+
+    values_load<T> values;
+    immer::vector<node_id> children;
+    bitmap_t nodemap;
+    bitmap_t datamap;
 };
 
 template <class T, class Hash>
@@ -42,71 +66,67 @@ struct set_save
     immer::set<T, Hash> set;
 };
 
-template <class T>
-struct set_load
-{
-    champ_info champ;
-};
-
-template <class T, class Hash>
+template <class T, class Hash, immer::detail::hamts::bits_t B>
 struct archive_save
 {
-    immer::map<node_id, inner_node_save<T>> inners;
+    immer::map<node_id, inner_node_save<T, B>> inners;
     immer::map<node_id, values_save<T>> collisions;
     immer::map<node_id, set_save<T, Hash>> sets;
 
     immer::map<const void*, node_id> node_ptr_to_id;
 };
 
-template <class T>
+template <class T, immer::detail::hamts::bits_t B = immer::default_bits>
 struct archive_load
-{};
+{
+    immer::map<node_id, inner_node_load<T, B>> inners;
+    immer::map<node_id, values_load<T>> collisions;
+    immer::map<node_id, champ_info> sets;
+};
 
-// template <class T>
-// archive_load<T> fix_leaf_nodes(archive_save<T> ar)
-// {
-//     auto leaves = immer::map<node_id, leaf_node_load<T>>{};
-//     for (const auto& item : ar.leaves) {
-//         auto data = immer::array<T>{item.second.begin, item.second.end};
-//         auto leaf = leaf_node_load<T>{
-//             .begin = data.begin(),
-//             .end   = data.end(),
-//             .data  = data,
-//         };
-//         leaves = std::move(leaves).set(item.first, leaf);
-//     }
+template <class T, class Hash, immer::detail::hamts::bits_t B>
+archive_load<T, B> to_load_archive(const archive_save<T, Hash, B>& archive)
+{
+    auto inners = immer::map<node_id, inner_node_load<T, B>>{};
+    for (const auto& [key, inner] : archive.inners) {
+        inners = std::move(inners).set(
+            key,
+            inner_node_load<T, B>{
+                .values   = {immer::array<T>{inner.values.begin,
+                                             inner.values.end}},
+                .children = inner.children,
+                .nodemap  = inner.nodemap,
+                .datamap  = inner.datamap,
+            });
+    }
 
-//     auto vectors = immer::map<node_id, vector_load<T>>{};
-//     for (const auto& [id, info] : ar.vectors) {
-//         vectors = std::move(vectors).set(id,
-//                                          vector_load<T>{
-//                                              .rbts = info.rbts,
-//                                          });
-//     }
+    auto collisions = immer::map<node_id, values_load<T>>{};
+    for (const auto& [key, collision] : archive.collisions) {
+        collisions = std::move(collisions)
+                         .set(key,
+                              values_load<T>{
+                                  .data = immer::array<T>{collision.begin,
+                                                          collision.end},
+                              });
+    }
 
-//     auto flex_vectors = immer::map<node_id, flex_vector_load<T>>{};
-//     for (const auto& [id, info] : ar.flex_vectors) {
-//         flex_vectors = std::move(flex_vectors)
-//                            .set(id,
-//                                 flex_vector_load<T>{
-//                                     .rbts = info.rbts,
-//                                 });
-//     }
+    auto sets = immer::map<node_id, champ_info>{};
+    for (const auto& [key, set] : archive.sets) {
+        sets = std::move(sets).set(key, set.champ);
+    }
 
-//     return {
-//         .leaves         = std::move(leaves),
-//         .inners         = std::move(ar.inners),
-//         .relaxed_inners = std::move(ar.relaxed_inners),
-//         .vectors        = std::move(vectors),
-//         .flex_vectors   = std::move(flex_vectors),
-//     };
-// }
+    return {
+        .inners     = std::move(inners),
+        .collisions = std::move(collisions),
+        .sets       = std::move(sets),
+    };
+}
 
 /**
  * Serialization functions.
  */
 template <class Archive, class T>
-void serialize(Archive& ar, values_save<T>& value)
+void save(Archive& ar, const values_save<T>& value)
 {
     ar(cereal::make_size_tag(
         static_cast<cereal::size_type>(value.end - value.begin)));
@@ -116,15 +136,56 @@ void serialize(Archive& ar, values_save<T>& value)
 }
 
 template <class Archive, class T>
-void serialize(Archive& ar, inner_node_save<T>& value)
+void load(Archive& ar, values_load<T>& m)
+{
+    cereal::size_type size;
+    ar(cereal::make_size_tag(size));
+
+    for (auto i = cereal::size_type{}; i < size; ++i) {
+        T x;
+        ar(x);
+        m.data = std::move(m.data).push_back(std::move(x));
+    }
+}
+
+template <class Archive, class T, immer::detail::hamts::bits_t B>
+void save(Archive& ar, const inner_node_save<T, B>& value)
+{
+    auto& values       = value.values;
+    auto& children     = value.children;
+    const auto nodemap = boost::endian::native_to_big(value.nodemap);
+    const auto datamap = boost::endian::native_to_big(value.datamap);
+    ar(CEREAL_NVP(values),
+       CEREAL_NVP(children),
+       CEREAL_NVP(nodemap),
+       CEREAL_NVP(datamap));
+}
+
+template <class Archive, class T, immer::detail::hamts::bits_t B>
+void load(Archive& ar, inner_node_load<T, B>& value)
 {
     auto& values   = value.values;
     auto& children = value.children;
-    ar(CEREAL_NVP(values), CEREAL_NVP(children));
+    auto& nodemap  = value.nodemap;
+    auto& datamap  = value.datamap;
+    ar(CEREAL_NVP(values),
+       CEREAL_NVP(children),
+       CEREAL_NVP(nodemap),
+       CEREAL_NVP(datamap));
+    boost::endian::big_to_native_inplace(nodemap);
+    boost::endian::big_to_native_inplace(datamap);
 }
 
 template <class Archive>
 void save(Archive& ar, const champ_info& value)
+{
+    auto& root = value.root;
+    auto& size = value.size;
+    ar(CEREAL_NVP(root), CEREAL_NVP(size));
+}
+
+template <class Archive>
+void load(Archive& ar, champ_info& value)
 {
     auto& root = value.root;
     auto& size = value.size;
@@ -137,8 +198,17 @@ void save(Archive& ar, const set_save<T...>& value)
     save(ar, value.champ);
 }
 
-template <class Archive, class... T>
-void save(Archive& ar, const archive_save<T...>& value)
+template <class Archive, class T, class Hash, immer::detail::hamts::bits_t B>
+void save(Archive& ar, const archive_save<T, Hash, B>& value)
+{
+    auto& inners     = value.inners;
+    auto& collisions = value.collisions;
+    auto& sets       = value.sets;
+    ar(CEREAL_NVP(inners), CEREAL_NVP(collisions), CEREAL_NVP(sets));
+}
+
+template <class Archive, class T, immer::detail::hamts::bits_t B>
+void load(Archive& ar, archive_load<T, B>& value)
 {
     auto& inners     = value.inners;
     auto& collisions = value.collisions;

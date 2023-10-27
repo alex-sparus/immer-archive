@@ -12,8 +12,8 @@ template <typename T,
           typename Equal,
           typename MemoryPolicy,
           immer::detail::hamts::bits_t B>
-std::pair<archive_save<T, Hash>, node_id> get_node_id(
-    archive_save<T, Hash> ar,
+std::pair<archive_save<T, Hash, B>, node_id> get_node_id(
+    archive_save<T, Hash, B> ar,
     const immer::detail::hamts::node<T, Hash, Equal, MemoryPolicy, B>* ptr)
 {
     auto* ptr_void = static_cast<const void*>(ptr);
@@ -30,7 +30,7 @@ std::pair<archive_save<T, Hash>, node_id> get_node_id(
 template <class T, class Hash, immer::detail::hamts::bits_t B>
 struct archive_builder
 {
-    archive_save<T, Hash> ar;
+    archive_save<T, Hash, B> ar;
 
     void visit_inner(const auto* node, auto depth)
     {
@@ -39,7 +39,10 @@ struct archive_builder
             return;
         }
 
-        auto node_info = inner_node_save<T>{};
+        auto node_info = inner_node_save<T, B>{
+            .nodemap = node->nodemap(),
+            .datamap = node->datamap(),
+        };
 
         if (node->datamap()) {
             node_info.values = {node->values(),
@@ -72,7 +75,7 @@ struct archive_builder
         ar.collisions = std::move(ar.collisions).set(id, std::move(info));
     }
 
-    void visit(const auto* node, auto depth)
+    void visit(const auto* node, immer::detail::hamts::count_t depth)
     {
         using immer::detail::hamts::max_depth;
 
@@ -112,9 +115,14 @@ auto save_nodes(
     return std::move(save.ar);
 }
 
-template <class T, class Hash>
-std::pair<archive_save<T, Hash>, node_id>
-save_set(immer::set<T, Hash> set, archive_save<T, Hash> archive)
+template <typename T,
+          typename Hash,
+          typename Equal,
+          typename MemoryPolicy,
+          immer::detail::hamts::bits_t B>
+std::pair<archive_save<T, Hash, B>, node_id>
+save_set(immer::set<T, Hash, Equal, MemoryPolicy, B> set,
+         archive_save<T, Hash, B> archive)
 {
     const auto& impl           = set.impl();
     auto root_id               = node_id{};

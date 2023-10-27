@@ -132,9 +132,11 @@ struct archive_builder
         }
 
         auto node_info = inner_node{};
+        // Explicit this-> call to workaround an "unused this" warning.
         pos.each(visitor_helper{}, [&node_info, this](auto& child_pos) mutable {
-            node_info.children = std::move(node_info.children)
-                                     .push_back(get_node_id(child_pos.node()));
+            node_info.children =
+                std::move(node_info.children)
+                    .push_back(this->get_node_id(child_pos.node()));
             visit(child_pos);
         });
         ar.inners = std::move(ar.inners).set(id, node_info);
@@ -154,7 +156,6 @@ struct archive_builder
         auto* r    = node->relaxed();
         auto index = std::size_t{};
         pos.each(visitor_helper{}, [&](auto& child_pos) mutable {
-            using ChildPos     = decltype(child_pos);
             node_info.children = std::move(node_info.children)
                                      .push_back(relaxed_child{
                                          .node = get_node_id(child_pos.node()),

@@ -17,6 +17,20 @@ add_executable(MyExample main.cpp test/test_struct_with_archive.cpp
 target_include_directories(MyExample PRIVATE immer .)
 target_link_libraries(MyExample PRIVATE spdlog::spdlog Catch2::Catch2WithMain)
 
+target_compile_options(
+  MyExample
+  PRIVATE -Wno-unknown-warning-option
+          -Werror
+          -Wall
+          -Wextra
+          -pedantic
+          -Wno-unused-parameter
+          -Wno-c++20-designator
+          -Wno-gnu-anonymous-struct
+          -Wno-nested-anon-types
+          # -Wno-nullability-extension -Wno-deprecated-declarations
+)
+
 if(CMAKE_GENERATOR STREQUAL "Xcode")
   target_compile_options(MyExample PRIVATE -O0 -fno-optimize-sibling-calls -g
                                            -fno-omit-frame-pointer)

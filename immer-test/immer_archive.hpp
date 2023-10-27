@@ -31,9 +31,7 @@ static_assert(sizeof(void*) == sizeof(node_id));
 template <class T>
 struct leaf_node_load
 {
-    const T* begin;
-    const T* end;
-    immer::array<T> data; // NOTE: data is only used while reading the archive
+    immer::array<T> data;
 };
 
 template <class T>
@@ -138,11 +136,8 @@ archive_load<T> fix_leaf_nodes(archive_save<T> ar)
 {
     auto leaves = immer::map<node_id, leaf_node_load<T>>{};
     for (const auto& item : ar.leaves) {
-        auto data = immer::array<T>{item.second.begin, item.second.end};
         auto leaf = leaf_node_load<T>{
-            .begin = data.begin(),
-            .end   = data.end(),
-            .data  = data,
+            .data = immer::array<T>{item.second.begin, item.second.end},
         };
         leaves = std::move(leaves).set(item.first, leaf);
     }
@@ -197,9 +192,6 @@ void load(Archive& ar, leaf_node_load<T>& m)
         ar(x);
         m.data = std::move(m.data).push_back(std::move(x));
     }
-
-    m.begin = m.data.begin();
-    m.end   = m.data.end();
 }
 
 template <class Archive>
