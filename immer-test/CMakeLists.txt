@@ -31,15 +31,29 @@ target_compile_options(
           # -Wno-nullability-extension -Wno-deprecated-declarations
 )
 
+if(UNIX AND NOT APPLE)
+  set(LINUX TRUE)
+endif()
+
 if(CMAKE_GENERATOR STREQUAL "Xcode")
   target_compile_options(MyExample PRIVATE -O0 -fno-optimize-sibling-calls -g
                                            -fno-omit-frame-pointer)
   target_compile_definitions(MyExample PRIVATE BOOST_USE_ASAN=1)
   target_compile_definitions(MyExample
                              PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+
+elseif(LINUX)
+  target_compile_options(
+    MyExample
+    PRIVATE -O1 -fno-optimize-sibling-calls -g -fno-omit-frame-pointer
+            -fsanitize-coverage=trace-pc-guard -fsanitize=address)
+  target_compile_definitions(MyExample PRIVATE BOOST_USE_ASAN=1)
+  target_compile_definitions(MyExample
+                             PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+  target_link_options(MyExample PRIVATE -fsanitize=address)
 else()
-  # ninja && ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=suppressions=../suppr.txt
-  # ./MyExample
+  # macOS but not Xcode ninja && ASAN_OPTIONS=detect_leaks=1
+  # LSAN_OPTIONS=suppressions=../suppr.txt ./MyExample
   target_compile_options(
     MyExample
     PRIVATE -O0 -fno-optimize-sibling-calls -g -fno-omit-frame-pointer
