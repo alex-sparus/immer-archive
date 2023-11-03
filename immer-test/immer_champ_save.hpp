@@ -12,8 +12,8 @@ template <typename T,
           typename Equal,
           typename MemoryPolicy,
           immer::detail::hamts::bits_t B>
-std::pair<archive_save<T, Hash, B>, node_id> get_node_id(
-    archive_save<T, Hash, B> ar,
+std::pair<nodes_save<T, B>, node_id> get_node_id(
+    nodes_save<T, B> ar,
     const immer::detail::hamts::node<T, Hash, Equal, MemoryPolicy, B>* ptr)
 {
     auto* ptr_void = static_cast<const void*>(ptr);
@@ -27,10 +27,10 @@ std::pair<archive_save<T, Hash, B>, node_id> get_node_id(
     return {std::move(ar), id};
 }
 
-template <class T, class Hash, immer::detail::hamts::bits_t B>
-struct archive_builder
+template <class T, immer::detail::hamts::bits_t B>
+struct nodes_archive_builder
 {
-    archive_save<T, Hash, B> ar;
+    nodes_save<T, B> ar;
 
     void visit_inner(const auto* node, auto depth)
     {
@@ -107,7 +107,7 @@ auto save_nodes(
     using champ_t = std::decay_t<decltype(champ)>;
     using node_t  = typename champ_t::node_t;
 
-    auto save = archive_builder<typename node_t::value_t, Hash, B>{
+    auto save = nodes_archive_builder<typename node_t::value_t, B>{
         .ar = std::move(ar),
     };
     save.visit(champ.root, 0);
@@ -120,21 +120,22 @@ template <typename T,
           typename Equal,
           typename MemoryPolicy,
           immer::detail::hamts::bits_t B>
-std::pair<archive_save<T, Hash, B>, node_id>
+std::pair<set_archive_save<T, Hash, B>, node_id>
 save_set(immer::set<T, Hash, Equal, MemoryPolicy, B> set,
-         archive_save<T, Hash, B> archive)
+         set_archive_save<T, Hash, B> archive)
 {
-    const auto& impl           = set.impl();
-    auto root_id               = node_id{};
-    std::tie(archive, root_id) = get_node_id(std::move(archive), impl.root);
+    const auto& impl = set.impl();
+    auto root_id     = node_id{};
+    std::tie(archive.nodes, root_id) =
+        get_node_id(std::move(archive.nodes), impl.root);
 
     if (auto* p = archive.sets.find(root_id)) {
         // Already been saved
         return {std::move(archive), root_id};
     }
 
-    archive = save_nodes(impl, std::move(archive));
-    assert(archive.inners.count(root_id));
+    archive.nodes = save_nodes(impl, std::move(archive.nodes));
+    assert(archive.nodes.inners.count(root_id));
 
     archive.sets = std::move(archive.sets)
                        .set(root_id,
@@ -145,6 +146,43 @@ save_set(immer::set<T, Hash, Equal, MemoryPolicy, B> set,
                                         .size = impl.size,
                                     },
                                 .set = std::move(set),
+                            });
+
+    return {std::move(archive), root_id};
+}
+
+template <typename K,
+          typename V,
+          typename Hash,
+          typename Equal,
+          typename MemoryPolicy,
+          immer::detail::hamts::bits_t B>
+std::pair<map_archive_save<K, V, Hash, B>, node_id>
+save_map(immer::map<K, V, Hash, Equal, MemoryPolicy, B> map,
+         map_archive_save<K, V, Hash, B> archive)
+{
+    const auto& impl = map.impl();
+    auto root_id     = node_id{};
+    std::tie(archive.nodes, root_id) =
+        get_node_id(std::move(archive.nodes), impl.root);
+
+    if (auto* p = archive.maps.find(root_id)) {
+        // Already been saved
+        return {std::move(archive), root_id};
+    }
+
+    archive.nodes = save_nodes(impl, std::move(archive.nodes));
+    assert(archive.nodes.inners.count(root_id));
+
+    archive.maps = std::move(archive.maps)
+                       .set(root_id,
+                            map_save<K, V, Hash>{
+                                .champ =
+                                    champ_info{
+                                        .root = root_id,
+                                        .size = impl.size,
+                                    },
+                                .map = std::move(map),
                             });
 
     return {std::move(archive), root_id};

@@ -27,6 +27,9 @@ template <typename K,
           detail::hamts::bits_t B>
 class map_transient;
 
+template <class Map>
+struct map_access;
+
 /*!
  * Immutable unordered mapping of values from type `K` to type `T`.
  *
@@ -66,6 +69,9 @@ template <typename K,
           detail::hamts::bits_t B = default_bits>
 class map
 {
+    template <class Map>
+    friend struct map_access;
+
     using value_t = std::pair<K, T>;
 
     using move_t =
@@ -177,7 +183,8 @@ public:
      */
     map(std::initializer_list<value_type> values)
         : impl_{impl_t::from_initializer_list(values)}
-    {}
+    {
+    }
 
     /*!
      * Constructs a map containing the elements in the range
@@ -189,7 +196,8 @@ public:
                                bool> = true>
     map(Iter first, Sent last)
         : impl_{impl_t::from_range(first, last)}
-    {}
+    {
+    }
 
     /*!
      * Default constructor.  It creates a map of `size() == 0`.  It
@@ -540,10 +548,13 @@ private:
         return impl_.sub(value);
     }
 
+public:
     map(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
 
+private:
     impl_t impl_ = impl_t::empty();
 };
 

@@ -41,7 +41,6 @@ if(CMAKE_GENERATOR STREQUAL "Xcode")
   target_compile_definitions(MyExample PRIVATE BOOST_USE_ASAN=1)
   target_compile_definitions(MyExample
                              PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
-
 elseif(LINUX)
   target_compile_options(
     MyExample
