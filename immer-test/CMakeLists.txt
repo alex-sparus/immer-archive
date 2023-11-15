@@ -62,3 +62,25 @@ else()
                              PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
   target_link_options(MyExample PRIVATE -fsanitize=leak)
 endif()
+
+# Fuzz
+add_executable(fuzz_set test/fuzz/fuzz_set.cpp)
+target_include_directories(fuzz_set PRIVATE immer/extra/fuzzer immer .)
+target_compile_options(
+  fuzz_set PRIVATE -g -O1 -fno-optimize-sibling-calls -fno-omit-frame-pointer
+                   -fsanitize=fuzzer,address)
+target_link_libraries(fuzz_set PRIVATE spdlog::spdlog)
+target_link_options(fuzz_set PRIVATE -g -O1 -fsanitize=fuzzer,address)
+target_compile_options(
+  fuzz_set
+  PRIVATE -Wno-unknown-warning-option
+          -Werror
+          -Wall
+          -Wextra
+          -pedantic
+          -Wno-unused-parameter
+          -Wno-c++20-designator
+          -Wno-gnu-anonymous-struct
+          -Wno-nested-anon-types
+          # -Wno-nullability-extension -Wno-deprecated-declarations
+)

@@ -30,4 +30,4 @@ tools/clojure/.lein*
 
 b/**
 build/**
-b-xcode/**
+b-*/
