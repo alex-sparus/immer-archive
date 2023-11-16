@@ -34,6 +34,56 @@
         "type": "github"
       }
     },
+    "google-fuzztest": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1700095437,
+        "narHash": "sha256-byoLmBhTnM+iwaKdCX4k579WyWdcmBL6SwvI5NGycyA=",
+        "owner": "google",
+        "repo": "fuzztest",
+        "rev": "4d3004f694ace6972feec7aa99c3bc520384d295",
+        "type": "github"
+      },
+      "original": {
+        "owner": "google",
+        "repo": "fuzztest",
+        "type": "github"
+      }
+    },
+    "google-fuzztest-absl": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1695250059,
+        "narHash": "sha256-/z6V2vncsE/HO6DbOHeFG5iwKajJ0agns7O0O0MMaxo=",
+        "owner": "abseil",
+        "repo": "abseil-cpp",
+        "rev": "db08109eeb15fcd856761557f1668c2b34690036",
+        "type": "github"
+      },
+      "original": {
+        "owner": "abseil",
+        "repo": "abseil-cpp",
+        "rev": "db08109eeb15fcd856761557f1668c2b34690036",
+        "type": "github"
+      }
+    },
+    "google-fuzztest-gtest": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1690989893,
+        "narHash": "sha256-t0RchAHTJbuI5YW4uyBPykTvcjy90JW9AOPNjIhwh6U=",
+        "owner": "google",
+        "repo": "googletest",
+        "rev": "f8d7d77c06936315286eb55f8de22cd23c188571",
+        "type": "github"
+      },
+      "original": {
+        "owner": "google",
+        "ref": "v1.14.0",
+        "repo": "googletest",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1682109806,
@@ -54,6 +104,9 @@
       "inputs": {
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
+        "google-fuzztest": "google-fuzztest",
+        "google-fuzztest-absl": "google-fuzztest-absl",
+        "google-fuzztest-gtest": "google-fuzztest-gtest",
         "nixpkgs": "nixpkgs"
       }
     },

@@ -8,6 +8,9 @@ project(
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(FETCHCONTENT_FULLY_DISCONNECTED ON)
+set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE ALWAYS)
+
 find_package(spdlog REQUIRED)
 find_package(cereal REQUIRED)
 find_package(Catch2 REQUIRED)
@@ -84,3 +87,7 @@ target_compile_options(
           -Wno-nested-anon-types
           # -Wno-nullability-extension -Wno-deprecated-declarations
 )
+
+add_subdirectory(test/google-fuzz)
+
+install(TARGETS MyExample fuzz_set DESTINATION bin)

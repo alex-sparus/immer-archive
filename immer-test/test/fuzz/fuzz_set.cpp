@@ -15,14 +15,15 @@ struct broken_hash
     std::size_t operator()(std::size_t map_key) const { return map_key & ~15; }
 };
 
-const auto into_set = [](const auto& set) {
+auto into_set(const auto& set)
+{
     using T     = typename std::decay_t<decltype(set)>::value_type;
     auto result = immer::set<T>{};
     for (const auto& item : set) {
         result = std::move(result).insert(item);
     }
     return result;
-};
+}
 
 } // namespace
 
@@ -108,9 +109,11 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
                     // This is the only thing that actually breaks if the hash
                     // of the loaded set is not the same as the hash function of
                     // the serialized set.
+                    (void) item;
                     assert(loaded->count(item));
                 }
                 for (const auto& item : *loaded) {
+                    (void) item;
                     assert(set.count(item));
                 }
             }
