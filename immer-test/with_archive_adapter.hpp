@@ -1,7 +1,7 @@
 #pragma once
 
-#include "immer_save.hpp"
-#include "rbtree_builder.hpp"
+#include <immer-archive/rbts/load.hpp>
+#include <immer-archive/rbts/save.hpp>
 
 #include <json_immer.hpp>
 

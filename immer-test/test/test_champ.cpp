@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <immer_champ_load.hpp>
-#include <immer_champ_save.hpp>
+#include <immer-archive/champ/map.hpp>
+#include <immer-archive/champ/set.hpp>
 
 #include "utils.hpp"
 
@@ -22,6 +22,20 @@ const auto gen_map = [](auto map, int count) {
     }
     return map;
 };
+
+struct test_value
+{
+    std::size_t id;
+    std::string value;
+};
+
+auto gen_table(auto table, std::size_t from, std::size_t to)
+{
+    for (auto i = std::min(from, to); i < std::max(from, to); ++i) {
+        table = std::move(table).insert(test_value{i, fmt::format("_{}_", i)});
+    }
+    return table;
+}
 
 const auto into_set = [](const auto& set) {
     using T     = typename std::decay_t<decltype(set)>::value_type;
@@ -199,4 +213,14 @@ TEST_CASE("Test save mutated map")
     std::tie(ar, map_id2) = immer_archive::champ::save_map(map, ar);
 
     REQUIRE(map_id != map_id2);
+}
+
+TEST_CASE("Test saving a table")
+{
+    const auto t1 = gen_table(immer::table<test_value>{}, 0, 10);
+    const auto t2 = gen_table(t1, 20, 30);
+
+    // const auto [ar, t1_id] = immer_archive::champ::save_table(t1, {});
+    // const auto ar_str      = to_json(ar);
+    // REQUIRE(ar_str == "");
 }

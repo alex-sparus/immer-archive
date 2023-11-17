@@ -1,23 +1,9 @@
 #pragma once
 
-#include "immer_champ_archive.hpp"
-#include <node_ptr.hpp>
+#include <immer-archive/champ/archive.hpp>
+#include <immer-archive/node_ptr.hpp>
 
 #include <spdlog/spdlog.h>
-
-namespace immer {
-/**
- * This probably should be moved into immer
- */
-template <class Map>
-struct map_access
-{
-    using value_t   = typename Map::value_t;
-    using hash_key  = typename Map::hash_key;
-    using equal_key = typename Map::equal_key;
-    using impl_t    = typename Map::impl_t;
-};
-} // namespace immer
 
 namespace immer_archive {
 namespace champ {
@@ -130,104 +116,6 @@ private:
     immer::map<node_id, node_ptr> collisions_;
     immer::map<node_id, inner_node_ptr> inners_;
 };
-
-template <class T,
-          typename Hash                  = std::hash<T>,
-          typename Equal                 = std::equal_to<T>,
-          typename MemoryPolicy          = immer::default_memory_policy,
-          immer::detail::hamts::bits_t B = immer::default_bits>
-class set_loader
-{
-public:
-    explicit set_loader(set_archive_load<T, B> archive)
-        : archive_{std::move(archive)}
-        , nodes_{archive_.nodes}
-    {
-    }
-
-    std::optional<immer::set<T, Hash>> load_set(node_id id)
-    {
-        auto* info = archive_.sets.find(id);
-        if (!info) {
-            return std::nullopt;
-        }
-
-        auto root = nodes_.load_inner(info->root);
-        if (!root) {
-            return std::nullopt;
-        }
-
-        auto impl =
-            immer::detail::hamts::champ<T, Hash, Equal, MemoryPolicy, B>{
-                root.release(), info->size};
-
-        // XXX This ctor is not public in immer.
-        auto set = immer::set<T, Hash>{std::move(impl)};
-        return set;
-    }
-
-private:
-    const set_archive_load<T, B> archive_;
-    nodes_loader<T, Hash, Equal, MemoryPolicy, B> nodes_;
-};
-
-template <class K,
-          class V,
-          typename Hash                  = std::hash<K>,
-          typename Equal                 = std::equal_to<K>,
-          typename MemoryPolicy          = immer::default_memory_policy,
-          immer::detail::hamts::bits_t B = immer::default_bits>
-class map_loader
-{
-public:
-    using map_t = immer::map<K, V, Hash, Equal, MemoryPolicy, B>;
-
-    explicit map_loader(map_archive_load<K, V, B> archive)
-        : archive_{std::move(archive)}
-        , nodes_{archive_.nodes}
-    {
-    }
-
-    std::optional<map_t> load_map(node_id id);
-
-private:
-    const map_archive_load<K, V, B> archive_;
-
-    using map_access = immer::map_access<map_t>;
-    nodes_loader<typename map_access::value_t,
-                 typename map_access::hash_key,
-                 typename map_access::equal_key,
-                 MemoryPolicy,
-                 B>
-        nodes_;
-};
-
-template <class K,
-          class V,
-          typename Hash,
-          typename Equal,
-          typename MemoryPolicy,
-          immer::detail::hamts::bits_t B>
-inline std::optional<
-    typename map_loader<K, V, Hash, Equal, MemoryPolicy, B>::map_t>
-map_loader<K, V, Hash, Equal, MemoryPolicy, B>::load_map(node_id id)
-{
-    auto* info = archive_.maps.find(id);
-    if (!info) {
-        return std::nullopt;
-    }
-
-    auto root = nodes_.load_inner(info->root);
-    if (!root) {
-        return std::nullopt;
-    }
-
-    auto impl = typename map_access::impl_t{root.release(), info->size};
-
-    // XXX This ctor is not public in immer.
-    auto map = map_t{std::move(impl)};
-    return map;
-}
 
 } // namespace champ
 } // namespace immer_archive

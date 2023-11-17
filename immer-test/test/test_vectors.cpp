@@ -11,8 +11,9 @@
 #include <fstream>
 #include <iostream>
 
-#include "immer_save.hpp"
-#include "rbtree_builder.hpp"
+#include <immer-archive/rbts/load.hpp>
+#include <immer-archive/rbts/save.hpp>
+
 #include <test/utils.hpp>
 
 #include <spdlog/spdlog.h>

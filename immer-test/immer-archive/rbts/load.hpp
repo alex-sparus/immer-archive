@@ -1,7 +1,7 @@
 #pragma once
 
-#include <immer_archive.hpp>
-#include <node_ptr.hpp>
+#include <immer-archive/node_ptr.hpp>
+#include <immer-archive/rbts/archive.hpp>
 
 #include <immer/vector.hpp>
 #include <optional>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "immer_archive.hpp"
+#include <immer-archive/rbts/archive.hpp>
 
 #include <immer/detail/rbts/rrbtree.hpp>
 
@@ -17,7 +17,8 @@ struct relaxed_pos_tag
 
 template <class T>
 struct position_tag : std::false_type
-{};
+{
+};
 
 template <class... Rest>
 struct position_tag<immer::detail::rbts::regular_sub_pos<Rest...>>

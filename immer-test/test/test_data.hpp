@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rbtree_builder.hpp>
+#include <immer-archive/rbts/load.hpp>
 #include <with_archive.hpp>
 
 /**

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "immer_champ_archive.hpp"
+#include <immer-archive/champ/archive.hpp>
 
 #include <spdlog/spdlog.h>
 
@@ -113,79 +113,6 @@ auto save_nodes(
     save.visit(champ.root, 0);
 
     return std::move(save.ar);
-}
-
-template <typename T,
-          typename Hash,
-          typename Equal,
-          typename MemoryPolicy,
-          immer::detail::hamts::bits_t B>
-std::pair<set_archive_save<T, Hash, B>, node_id>
-save_set(immer::set<T, Hash, Equal, MemoryPolicy, B> set,
-         set_archive_save<T, Hash, B> archive)
-{
-    const auto& impl = set.impl();
-    auto root_id     = node_id{};
-    std::tie(archive.nodes, root_id) =
-        get_node_id(std::move(archive.nodes), impl.root);
-
-    if (auto* p = archive.sets.find(root_id)) {
-        // Already been saved
-        return {std::move(archive), root_id};
-    }
-
-    archive.nodes = save_nodes(impl, std::move(archive.nodes));
-    assert(archive.nodes.inners.count(root_id));
-
-    archive.sets = std::move(archive.sets)
-                       .set(root_id,
-                            set_save<T, Hash>{
-                                .champ =
-                                    champ_info{
-                                        .root = root_id,
-                                        .size = impl.size,
-                                    },
-                                .set = std::move(set),
-                            });
-
-    return {std::move(archive), root_id};
-}
-
-template <typename K,
-          typename V,
-          typename Hash,
-          typename Equal,
-          typename MemoryPolicy,
-          immer::detail::hamts::bits_t B>
-std::pair<map_archive_save<K, V, Hash, B>, node_id>
-save_map(immer::map<K, V, Hash, Equal, MemoryPolicy, B> map,
-         map_archive_save<K, V, Hash, B> archive)
-{
-    const auto& impl = map.impl();
-    auto root_id     = node_id{};
-    std::tie(archive.nodes, root_id) =
-        get_node_id(std::move(archive.nodes), impl.root);
-
-    if (auto* p = archive.maps.find(root_id)) {
-        // Already been saved
-        return {std::move(archive), root_id};
-    }
-
-    archive.nodes = save_nodes(impl, std::move(archive.nodes));
-    assert(archive.nodes.inners.count(root_id));
-
-    archive.maps = std::move(archive.maps)
-                       .set(root_id,
-                            map_save<K, V, Hash>{
-                                .champ =
-                                    champ_info{
-                                        .root = root_id,
-                                        .size = impl.size,
-                                    },
-                                .map = std::move(map),
-                            });
-
-    return {std::move(archive), root_id};
 }
 
 } // namespace champ

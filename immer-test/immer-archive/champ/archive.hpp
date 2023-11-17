@@ -3,6 +3,7 @@
 #include <immer/array.hpp>
 #include <immer/map.hpp>
 #include <immer/set.hpp>
+#include <immer/table.hpp>
 #include <immer/vector.hpp>
 
 #include <cereal/cereal.hpp>
@@ -59,22 +60,6 @@ struct inner_node_load
     bitmap_t datamap;
 };
 
-template <class T, class Hash>
-struct set_save
-{
-    champ_info champ;
-    // Saving the archived set, so that no mutations are allowed to happen.
-    immer::set<T, Hash> set;
-};
-
-template <class K, class V, class Hash>
-struct map_save
-{
-    champ_info champ;
-    // Saving the archived map, so that no mutations are allowed to happen.
-    immer::map<K, V, Hash> map;
-};
-
 template <class T, immer::detail::hamts::bits_t B>
 struct nodes_save
 {
@@ -89,36 +74,6 @@ struct nodes_load
 {
     immer::map<node_id, inner_node_load<T, B>> inners;
     immer::map<node_id, values_load<T>> collisions;
-};
-
-template <class T, class Hash, immer::detail::hamts::bits_t B>
-struct set_archive_save
-{
-    nodes_save<T, B> nodes;
-    immer::map<node_id, set_save<T, Hash>> sets;
-};
-
-template <class T, immer::detail::hamts::bits_t B = immer::default_bits>
-struct set_archive_load
-{
-    nodes_load<T, B> nodes;
-    immer::map<node_id, champ_info> sets;
-};
-
-template <class K, class V, class Hash, immer::detail::hamts::bits_t B>
-struct map_archive_save
-{
-    nodes_save<std::pair<K, V>, B> nodes;
-    immer::map<node_id, map_save<K, V, Hash>> maps;
-};
-
-template <class K,
-          class V,
-          immer::detail::hamts::bits_t B = immer::default_bits>
-struct map_archive_load
-{
-    nodes_load<std::pair<K, V>, B> nodes;
-    immer::map<node_id, champ_info> maps;
 };
 
 template <class T, immer::detail::hamts::bits_t B>
@@ -150,36 +105,6 @@ nodes_load<T, B> to_load_archive(const nodes_save<T, B>& archive)
     return {
         .inners     = std::move(inners),
         .collisions = std::move(collisions),
-    };
-}
-
-template <class T, class Hash, immer::detail::hamts::bits_t B>
-set_archive_load<T, B>
-to_load_archive(const set_archive_save<T, Hash, B>& archive)
-{
-    auto sets = immer::map<node_id, champ_info>{};
-    for (const auto& [key, set] : archive.sets) {
-        sets = std::move(sets).set(key, set.champ);
-    }
-
-    return {
-        .nodes = to_load_archive(archive.nodes),
-        .sets  = std::move(sets),
-    };
-}
-
-template <class K, class V, class Hash, immer::detail::hamts::bits_t B>
-map_archive_load<K, V, B>
-to_load_archive(const map_archive_save<K, V, Hash, B>& archive)
-{
-    auto maps = immer::map<node_id, champ_info>{};
-    for (const auto& [key, map] : archive.maps) {
-        maps = std::move(maps).set(key, map.champ);
-    }
-
-    return {
-        .nodes = to_load_archive(archive.nodes),
-        .maps  = std::move(maps),
     };
 }
 
@@ -253,18 +178,6 @@ void load(Archive& ar, champ_info& value)
     ar(CEREAL_NVP(root), CEREAL_NVP(size));
 }
 
-template <class Archive, class... T>
-void save(Archive& ar, const set_save<T...>& value)
-{
-    save(ar, value.champ);
-}
-
-template <class Archive, class... T>
-void save(Archive& ar, const map_save<T...>& value)
-{
-    save(ar, value.champ);
-}
-
 template <class Archive, class T, immer::detail::hamts::bits_t B>
 void save(Archive& ar, const nodes_save<T, B>& value)
 {
@@ -273,48 +186,12 @@ void save(Archive& ar, const nodes_save<T, B>& value)
     ar(CEREAL_NVP(inners), CEREAL_NVP(collisions));
 }
 
-template <class Archive, class T, class Hash, immer::detail::hamts::bits_t B>
-void save(Archive& ar, const set_archive_save<T, Hash, B>& value)
-{
-    auto& nodes = value.nodes;
-    auto& sets  = value.sets;
-    ar(CEREAL_NVP(nodes), CEREAL_NVP(sets));
-}
-
-template <class Archive,
-          class K,
-          class V,
-          class Hash,
-          immer::detail::hamts::bits_t B>
-void save(Archive& ar, const map_archive_save<K, V, Hash, B>& value)
-{
-    auto& nodes = value.nodes;
-    auto& maps  = value.maps;
-    ar(CEREAL_NVP(nodes), CEREAL_NVP(maps));
-}
-
 template <class Archive, class T, immer::detail::hamts::bits_t B>
 void load(Archive& ar, nodes_load<T, B>& value)
 {
     auto& inners     = value.inners;
     auto& collisions = value.collisions;
     ar(CEREAL_NVP(inners), CEREAL_NVP(collisions));
-}
-
-template <class Archive, class T, immer::detail::hamts::bits_t B>
-void load(Archive& ar, set_archive_load<T, B>& value)
-{
-    auto& nodes = value.nodes;
-    auto& sets  = value.sets;
-    ar(CEREAL_NVP(nodes), CEREAL_NVP(sets));
-}
-
-template <class Archive, class K, class V, immer::detail::hamts::bits_t B>
-void load(Archive& ar, map_archive_load<K, V, B>& value)
-{
-    auto& nodes = value.nodes;
-    auto& maps  = value.maps;
-    ar(CEREAL_NVP(nodes), CEREAL_NVP(maps));
 }
 
 } // namespace champ
