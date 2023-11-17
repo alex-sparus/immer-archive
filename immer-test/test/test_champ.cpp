@@ -1,7 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <immer-archive/champ/map.hpp>
-#include <immer-archive/champ/set.hpp>
+#include <immer-archive/champ/champ.hpp>
 
 #include "utils.hpp"
 
@@ -27,6 +26,24 @@ struct test_value
 {
     std::size_t id;
     std::string value;
+
+    auto tie() const { return std::tie(id, value); }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(CEREAL_NVP(id), CEREAL_NVP(value));
+    }
+
+    friend bool operator==(const test_value& left, const test_value& right)
+    {
+        return left.tie() == right.tie();
+    }
+
+    friend std::ostream& operator<<(std::ostream& s, const test_value& value)
+    {
+        return s << fmt::format("({}, {})", value.id, value.value);
+    }
 };
 
 auto gen_table(auto table, std::size_t from, std::size_t to)
@@ -79,18 +96,20 @@ struct broken_hash
 
 TEST_CASE("Test saving a set")
 {
-    const auto set = gen_set(immer::set<std::string, broken_hash>{}, 200);
-    const auto [ar, set_id] = immer_archive::champ::save_set(set, {});
+    using Container = immer::set<std::string, broken_hash>;
+
+    const auto set          = gen_set(Container{}, 200);
+    const auto [ar, set_id] = immer_archive::champ::save_container(set, {});
     const auto ar_str       = to_json(ar);
     // REQUIRE(ar_str == "");
 
     const auto loaded_archive =
-        from_json<immer_archive::champ::set_archive_load<std::string>>(ar_str);
-    REQUIRE(loaded_archive.sets.size() == 1);
+        from_json<immer_archive::champ::container_archive_load<Container>>(
+            ar_str);
+    REQUIRE(loaded_archive.containers.size() == 1);
 
-    auto loader = immer_archive::champ::set_loader<std::string, broken_hash>{
-        loaded_archive};
-    const auto loaded = loader.load_set(set_id);
+    auto loader       = immer_archive::champ::container_loader{loaded_archive};
+    const auto loaded = loader.load(set_id);
     REQUIRE(loaded.has_value());
     REQUIRE(into_set(set).size() == set.size());
     for (const auto& item : set) {
@@ -102,17 +121,18 @@ TEST_CASE("Test saving a set")
 
 TEST_CASE("Test archive conversion, no json")
 {
-    const auto set    = gen_set(immer::set<std::string, broken_hash>{}, 200);
-    const auto set2   = gen_set(set, 300);
-    auto [ar, set_id] = immer_archive::champ::save_set(set, {});
-    auto set2_id      = immer_archive::champ::node_id{};
-    std::tie(ar, set2_id) = immer_archive::champ::save_set(set2, ar);
+    using Container = immer::set<std::string, broken_hash>;
 
-    auto loader = immer_archive::champ::set_loader<std::string, broken_hash>{
-        to_load_archive(ar)};
+    const auto set        = gen_set(Container{}, 200);
+    const auto set2       = gen_set(set, 300);
+    auto [ar, set_id]     = immer_archive::champ::save_container(set, {});
+    auto set2_id          = immer_archive::champ::node_id{};
+    std::tie(ar, set2_id) = immer_archive::champ::save_container(set2, ar);
+
+    auto loader = immer_archive::champ::container_loader{to_load_archive(ar)};
 
     const auto check_set = [&loader](auto id, const auto& expected) {
-        const auto loaded = loader.load_set(id);
+        const auto loaded = loader.load(id);
         REQUIRE(loaded.has_value());
         REQUIRE(into_set(*loaded) == into_set(expected));
         REQUIRE(into_set(expected).size() == expected.size());
@@ -133,32 +153,34 @@ TEST_CASE("Test archive conversion, no json")
 
 TEST_CASE("Test save mutated set")
 {
-    auto set          = gen_set(immer::set<std::string, broken_hash>{}, 200);
-    auto [ar, set_id] = immer_archive::champ::save_set(set, {});
+    using Container = immer::set<std::string, broken_hash>;
+
+    auto set          = gen_set(Container{}, 200);
+    auto [ar, set_id] = immer_archive::champ::save_container(set, {});
 
     set                   = std::move(set).insert("435");
     auto set_id2          = immer_archive::champ::node_id{};
-    std::tie(ar, set_id2) = immer_archive::champ::save_set(set, ar);
+    std::tie(ar, set_id2) = immer_archive::champ::save_container(set, ar);
 
     REQUIRE(set_id != set_id2);
 }
 
 TEST_CASE("Test saving a map")
 {
-    const auto map = gen_map(immer::map<int, std::string, broken_hash>{}, 200);
-    const auto [ar, map_id] = immer_archive::champ::save_map(map, {});
+    using Container = immer::map<int, std::string, broken_hash>;
+
+    const auto map          = gen_map(Container{}, 200);
+    const auto [ar, map_id] = immer_archive::champ::save_container(map, {});
     const auto ar_str       = to_json(ar);
     // REQUIRE(ar_str == "");
 
     const auto loaded_archive =
-        from_json<immer_archive::champ::map_archive_load<int, std::string>>(
+        from_json<immer_archive::champ::container_archive_load<Container>>(
             ar_str);
-    REQUIRE(loaded_archive.maps.size() == 1);
+    REQUIRE(loaded_archive.containers.size() == 1);
 
-    auto loader =
-        immer_archive::champ::map_loader<int, std::string, broken_hash>{
-            loaded_archive};
-    const auto loaded = loader.load_map(map_id);
+    auto loader       = immer_archive::champ::container_loader{loaded_archive};
+    const auto loaded = loader.load(map_id);
     REQUIRE(loaded.has_value());
     REQUIRE(into_map(map).size() == map.size());
     for (const auto& [key, value] : map) {
@@ -171,18 +193,18 @@ TEST_CASE("Test saving a map")
 
 TEST_CASE("Test map archive conversion, no json")
 {
-    const auto map  = gen_map(immer::map<int, std::string, broken_hash>{}, 200);
-    const auto map2 = gen_map(map, 300);
-    auto [ar, map_id]     = immer_archive::champ::save_map(map, {});
-    auto map2_id          = immer_archive::champ::node_id{};
-    std::tie(ar, map2_id) = immer_archive::champ::save_map(map2, ar);
+    using Container = immer::map<int, std::string, broken_hash>;
 
-    auto loader =
-        immer_archive::champ::map_loader<int, std::string, broken_hash>{
-            to_load_archive(ar)};
+    const auto map        = gen_map(Container{}, 200);
+    const auto map2       = gen_map(map, 300);
+    auto [ar, map_id]     = immer_archive::champ::save_container(map, {});
+    auto map2_id          = immer_archive::champ::node_id{};
+    std::tie(ar, map2_id) = immer_archive::champ::save_container(map2, ar);
+
+    auto loader = immer_archive::champ::container_loader{to_load_archive(ar)};
 
     const auto check_map = [&loader](auto id, const auto& expected) {
-        const auto loaded = loader.load_map(id);
+        const auto loaded = loader.load(id);
         REQUIRE(loaded.has_value());
         REQUIRE(into_map(*loaded) == into_map(expected));
         REQUIRE(into_map(expected).size() == expected.size());
@@ -206,21 +228,93 @@ TEST_CASE("Test map archive conversion, no json")
 TEST_CASE("Test save mutated map")
 {
     auto map = gen_map(immer::map<int, std::string, broken_hash>{}, 200);
-    auto [ar, map_id] = immer_archive::champ::save_map(map, {});
+    auto [ar, map_id] = immer_archive::champ::save_container(map, {});
 
     map                   = std::move(map).set(999, "435");
     auto map_id2          = immer_archive::champ::node_id{};
-    std::tie(ar, map_id2) = immer_archive::champ::save_map(map, ar);
+    std::tie(ar, map_id2) = immer_archive::champ::save_container(map, ar);
 
     REQUIRE(map_id != map_id2);
 }
 
+namespace {
+template <class T1, class T2>
+void test_table_types()
+{
+    const auto t1 = gen_table(T1{}, 0, 100);
+    const auto t2 = gen_table(t1, 200, 210);
+
+    auto [ar, t1_id] = immer_archive::champ::save_container(t1, {});
+
+    auto t2_id          = immer_archive::champ::node_id{};
+    std::tie(ar, t2_id) = immer_archive::champ::save_container(t2, ar);
+
+    const auto ar_str = to_json(ar);
+    // REQUIRE(ar_str == "");
+
+    const auto loaded_archive =
+        from_json<immer_archive::champ::container_archive_load<T2>>(ar_str);
+
+    auto loader = immer_archive::champ::container_loader{loaded_archive};
+
+    const auto check = [&loader](auto id, const auto& expected) {
+        const auto loaded = loader.load(id);
+        REQUIRE(loaded.has_value());
+
+        for (const auto& item : expected) {
+            INFO(item);
+            REQUIRE(loaded.value().count(item.id));
+            REQUIRE(loaded.value()[item.id] == item);
+        }
+        for (const auto& item : *loaded) {
+            REQUIRE(expected[item.id] == item);
+        }
+    };
+
+    check(t1_id, t1);
+    check(t2_id, t2);
+}
+} // namespace
+
 TEST_CASE("Test saving a table")
 {
-    const auto t1 = gen_table(immer::table<test_value>{}, 0, 10);
-    const auto t2 = gen_table(t1, 20, 30);
+    using different_table_t =
+        immer::table<test_value, immer::table_key_fn, broken_hash>;
+    using table_t = immer::table<test_value>;
 
-    // const auto [ar, t1_id] = immer_archive::champ::save_table(t1, {});
-    // const auto ar_str      = to_json(ar);
+    // Verify that saving and loading with customized hash works.
+    test_table_types<table_t, table_t>();
+    test_table_types<different_table_t, different_table_t>();
+}
+
+TEST_CASE("Test saving a table, no json")
+{
+    using table_t = immer::table<test_value>;
+    const auto t1 = gen_table(table_t{}, 0, 100);
+    const auto t2 = gen_table(t1, 200, 210);
+
+    auto [ar, t1_id] = immer_archive::champ::save_container(t1, {});
+
+    auto t2_id          = immer_archive::champ::node_id{};
+    std::tie(ar, t2_id) = immer_archive::champ::save_container(t2, ar);
+
+    const auto ar_str = to_json(ar);
     // REQUIRE(ar_str == "");
+
+    auto loader = immer_archive::champ::container_loader{to_load_archive(ar)};
+
+    const auto check = [&loader](auto id, const auto& expected) {
+        const auto loaded = loader.load(id);
+        REQUIRE(loaded.has_value());
+
+        for (const auto& item : expected) {
+            REQUIRE(loaded.value()[item.id] == item);
+        }
+        for (const auto& item : *loaded) {
+            REQUIRE(expected[item.id] == item);
+        }
+    };
+
+    check(t1_id, t1);
+    check(t2_id, t2);
 }
