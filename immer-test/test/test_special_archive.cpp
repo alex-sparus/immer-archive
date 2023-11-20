@@ -3,8 +3,9 @@
 #include <test/utils.hpp>
 
 #include <boost/hana.hpp>
-#include <json_with_archive.hpp>
-#include <with_archive_adapter.hpp>
+#include <immer-archive/json/archivable.hpp>
+#include <immer-archive/json/json_with_archive.hpp>
+#include <immer-archive/rbts/vector.hpp>
 
 // to save std::pair
 #include <cereal/types/utility.hpp>
@@ -19,10 +20,12 @@ namespace hana = boost::hana;
  */
 struct test_data
 {
-    immer_archive::vector_one_archivable<int> ints;
-    immer_archive::vector_one_archivable<std::string> strings;
+    immer_archive::archivable<immer_archive::vector_one<int>> ints;
+    immer_archive::archivable<immer_archive::vector_one<std::string>> strings;
 
-    auto tie() const { return std::tie(ints, strings); }
+    immer_archive::archivable<immer_archive::flex_vector_one<int>> flex_ints;
+
+    auto tie() const { return std::tie(ints, strings, flex_ints); }
 
     friend bool operator==(const test_data& left, const test_data& right)
     {
@@ -35,7 +38,7 @@ struct test_data
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(CEREAL_NVP(ints), CEREAL_NVP(strings));
+        ar(CEREAL_NVP(ints), CEREAL_NVP(strings), CEREAL_NVP(flex_ints));
     }
 };
 
@@ -46,9 +49,14 @@ struct test_data
 inline auto get_archives_types(const test_data&)
 {
     auto names = hana::make_map(
-        hana::make_pair(hana::type_c<int>, BOOST_HANA_STRING("ints")),
-        hana::make_pair(hana::type_c<std::string>,
-                        BOOST_HANA_STRING("strings")));
+        hana::make_pair(hana::type_c<immer_archive::vector_one<int>>,
+                        BOOST_HANA_STRING("ints")),
+        hana::make_pair(hana::type_c<immer_archive::vector_one<std::string>>,
+                        BOOST_HANA_STRING("strings")),
+        hana::make_pair(hana::type_c<immer_archive::flex_vector_one<int>>,
+                        BOOST_HANA_STRING("flex_ints"))
+
+    );
     return names;
 }
 
@@ -63,8 +71,9 @@ TEST_CASE("Save with a special archive")
 {
     const auto ints1 = test::gen(test::example_vector{}, 3);
     const auto test1 = test_data{
-        .ints    = ints1,
-        .strings = {"one", "two"},
+        .ints      = ints1,
+        .strings   = {"one", "two"},
+        .flex_ints = immer_archive::flex_vector_one<int>{ints1},
     };
 
     const auto [json_str, archives] =
@@ -91,9 +100,9 @@ TEST_CASE("Save with a special archive")
             ar(CEREAL_NVP(archives));
             return archives;
         }();
-        REQUIRE(
-            archives_loaded.storage[hana::type_c<int>].archive.leaves.size() ==
-            2);
+        REQUIRE(archives_loaded
+                    .storage[hana::type_c<immer_archive::vector_one<int>>]
+                    .archive.leaves.size() == 2);
     }
 
     // REQUIRE(json_str == "");
@@ -109,16 +118,20 @@ TEST_CASE("Save with a special archive, special type is enclosed")
 {
     const auto ints1 = test::gen(test::example_vector{}, 3);
     const auto test1 = test_data{
-        .ints    = ints1,
-        .strings = {"one", "two"},
+        .ints      = ints1,
+        .strings   = {"one", "two"},
+        .flex_ints = immer_archive::flex_vector_one<int>{ints1},
     };
     const auto test2 = test_data{
-        .ints    = ints1,
-        .strings = {"three"},
+        .ints      = ints1,
+        .strings   = {"three"},
+        .flex_ints = immer_archive::flex_vector_one<int>{ints1},
     };
 
     // At the beginning, the vector is shared, it's the same data.
-    REQUIRE(test1.ints.vector.identity() == test2.ints.vector.identity());
+    REQUIRE(test1.ints.container.identity() == test2.ints.container.identity());
+    REQUIRE(test1.flex_ints.container.identity() ==
+            test2.flex_ints.container.identity());
 
     const auto [json_str, archives] =
         immer_archive::to_json_with_archive(std::make_pair(test1, test2));
@@ -144,9 +157,9 @@ TEST_CASE("Save with a special archive, special type is enclosed")
             ar(CEREAL_NVP(archives));
             return archives;
         }();
-        REQUIRE(
-            archives_loaded.storage[hana::type_c<int>].archive.leaves.size() ==
-            2);
+        REQUIRE(archives_loaded
+                    .storage[hana::type_c<immer_archive::vector_one<int>>]
+                    .archive.leaves.size() == 2);
     }
 
     // REQUIRE(json_str == "");
@@ -158,7 +171,9 @@ TEST_CASE("Save with a special archive, special type is enclosed")
         REQUIRE(loaded2 == test2);
 
         // After loading, two vectors are still reused.
-        REQUIRE(loaded1.ints.vector.identity() ==
-                loaded2.ints.vector.identity());
+        REQUIRE(loaded1.ints.container.identity() ==
+                loaded2.ints.container.identity());
+        REQUIRE(loaded1.flex_ints.container.identity() ==
+                loaded2.flex_ints.container.identity());
     }
 }

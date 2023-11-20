@@ -190,4 +190,38 @@ private:
     immer::map<node_id, inner_node_ptr> inners_;
 };
 
+template <class T,
+          typename MemoryPolicy         = immer::default_memory_policy,
+          immer::detail::rbts::bits_t B = immer::default_bits>
+class vector_loader
+{
+public:
+    explicit vector_loader(archive_load<T> ar)
+        : loader{std::move(ar)}
+    {
+    }
+
+    auto load(node_id id) { return loader.load_vector(id); }
+
+private:
+    loader<T, MemoryPolicy, B> loader;
+};
+
+template <class T,
+          typename MemoryPolicy         = immer::default_memory_policy,
+          immer::detail::rbts::bits_t B = immer::default_bits>
+class flex_vector_loader
+{
+public:
+    explicit flex_vector_loader(archive_load<T> ar)
+        : loader{std::move(ar)}
+    {
+    }
+
+    auto load(node_id id) { return loader.load_flex_vector(id); }
+
+private:
+    loader<T, MemoryPolicy, B> loader;
+};
+
 } // namespace immer_archive

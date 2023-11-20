@@ -1,7 +1,7 @@
 #pragma once
 
-#include <immer-archive/rbts/load.hpp>
-#include <json_immer.hpp>
+#include <immer-archive/json/json_immer.hpp>
+#include <immer-archive/traits.hpp>
 
 #include <boost/hana.hpp>
 
@@ -37,17 +37,17 @@ struct archives_save
     }
 
     template <class T>
-    friend immer_archive::archive_save<T>& get_save_archive(archives_save& ars)
+    auto& get_save_archive()
     {
-        return ars.storage[hana::type_c<T>];
+        return storage[hana::type_c<T>];
     }
 };
 
-template <class T>
+template <class Container>
 struct archive_type_load
 {
-    archive_load<T> archive;
-    std::optional<loader<T>> loader;
+    typename container_traits<Container>::load_archive_t archive;
+    std::optional<typename container_traits<Container>::loader_t> loader;
 };
 
 template <class Storage, class Names>
@@ -57,10 +57,10 @@ struct archives_load
 
     Storage storage;
 
-    template <class T>
-    friend loader<T>& get_loader(archives_load& ars)
+    template <class Container>
+    auto& get_loader()
     {
-        auto& load = ars.storage[hana::type_c<T>];
+        auto& load = storage[hana::type_c<Container>];
         if (!load.loader) {
             load.loader.emplace(load.archive);
         }
@@ -85,8 +85,9 @@ inline auto generate_archives_save(auto type_names)
             using Type = typename decltype(+hana::first(pair))::type;
             return hana::insert(
                 map,
-                hana::make_pair(hana::first(pair),
-                                immer_archive::archive_save<Type>{}));
+                hana::make_pair(
+                    hana::first(pair),
+                    typename container_traits<Type>::save_archive_t{}));
         });
 
     using Storage = decltype(storage);

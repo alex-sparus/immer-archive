@@ -17,8 +17,7 @@ struct relaxed_pos_tag
 
 template <class T>
 struct position_tag : std::false_type
-{
-};
+{};
 
 template <class... Rest>
 struct position_tag<immer::detail::rbts::regular_sub_pos<Rest...>>
@@ -240,8 +239,8 @@ auto save_nodes(const immer::detail::rbts::rrbtree<T, MemoryPolicy, B, 1>& tree,
 }
 
 template <class T>
-std::pair<archive_save<T>, node_id> save_vector(vector_one<T> vec,
-                                                archive_save<T> archive)
+std::pair<archive_save<T>, node_id> save_to_archive(vector_one<T> vec,
+                                                    archive_save<T> archive)
 {
     const auto& impl           = vec.impl();
     auto root_id               = node_id{};
@@ -285,8 +284,8 @@ std::pair<archive_save<T>, node_id> save_vector(vector_one<T> vec,
 }
 
 template <class T>
-std::pair<archive_save<T>, node_id> save_vector(flex_vector_one<T> vec,
-                                                archive_save<T> archive)
+std::pair<archive_save<T>, node_id> save_to_archive(flex_vector_one<T> vec,
+                                                    archive_save<T> archive)
 {
     const auto& impl           = vec.impl();
     auto root_id               = node_id{};

@@ -42,7 +42,7 @@ void save(Archive& ar, const vector_with_archive<T, MemoryPolicy, B>& value)
 {
     assert(value.archive_save);
     auto [archive, id] =
-        save_vector(value.vector, std::move(*value.archive_save));
+        save_to_archive(value.vector, std::move(*value.archive_save));
     *value.archive_save = std::move(archive);
     ar(id);
 }
