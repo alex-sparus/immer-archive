@@ -99,7 +99,7 @@ TEST_CASE("Test saving a set")
     using Container = immer::set<std::string, broken_hash>;
 
     const auto set          = gen_set(Container{}, 200);
-    const auto [ar, set_id] = immer_archive::champ::save_container(set, {});
+    const auto [ar, set_id] = immer_archive::champ::save_to_archive(set, {});
     const auto ar_str       = to_json(ar);
     // REQUIRE(ar_str == "");
 
@@ -125,9 +125,9 @@ TEST_CASE("Test archive conversion, no json")
 
     const auto set        = gen_set(Container{}, 200);
     const auto set2       = gen_set(set, 300);
-    auto [ar, set_id]     = immer_archive::champ::save_container(set, {});
+    auto [ar, set_id]     = immer_archive::champ::save_to_archive(set, {});
     auto set2_id          = immer_archive::champ::node_id{};
-    std::tie(ar, set2_id) = immer_archive::champ::save_container(set2, ar);
+    std::tie(ar, set2_id) = immer_archive::champ::save_to_archive(set2, ar);
 
     auto loader = immer_archive::champ::container_loader{to_load_archive(ar)};
 
@@ -156,11 +156,11 @@ TEST_CASE("Test save mutated set")
     using Container = immer::set<std::string, broken_hash>;
 
     auto set          = gen_set(Container{}, 200);
-    auto [ar, set_id] = immer_archive::champ::save_container(set, {});
+    auto [ar, set_id] = immer_archive::champ::save_to_archive(set, {});
 
     set                   = std::move(set).insert("435");
     auto set_id2          = immer_archive::champ::node_id{};
-    std::tie(ar, set_id2) = immer_archive::champ::save_container(set, ar);
+    std::tie(ar, set_id2) = immer_archive::champ::save_to_archive(set, ar);
 
     REQUIRE(set_id != set_id2);
 }
@@ -170,7 +170,7 @@ TEST_CASE("Test saving a map")
     using Container = immer::map<int, std::string, broken_hash>;
 
     const auto map          = gen_map(Container{}, 200);
-    const auto [ar, map_id] = immer_archive::champ::save_container(map, {});
+    const auto [ar, map_id] = immer_archive::champ::save_to_archive(map, {});
     const auto ar_str       = to_json(ar);
     // REQUIRE(ar_str == "");
 
@@ -197,9 +197,9 @@ TEST_CASE("Test map archive conversion, no json")
 
     const auto map        = gen_map(Container{}, 200);
     const auto map2       = gen_map(map, 300);
-    auto [ar, map_id]     = immer_archive::champ::save_container(map, {});
+    auto [ar, map_id]     = immer_archive::champ::save_to_archive(map, {});
     auto map2_id          = immer_archive::champ::node_id{};
-    std::tie(ar, map2_id) = immer_archive::champ::save_container(map2, ar);
+    std::tie(ar, map2_id) = immer_archive::champ::save_to_archive(map2, ar);
 
     auto loader = immer_archive::champ::container_loader{to_load_archive(ar)};
 
@@ -228,11 +228,11 @@ TEST_CASE("Test map archive conversion, no json")
 TEST_CASE("Test save mutated map")
 {
     auto map = gen_map(immer::map<int, std::string, broken_hash>{}, 200);
-    auto [ar, map_id] = immer_archive::champ::save_container(map, {});
+    auto [ar, map_id] = immer_archive::champ::save_to_archive(map, {});
 
     map                   = std::move(map).set(999, "435");
     auto map_id2          = immer_archive::champ::node_id{};
-    std::tie(ar, map_id2) = immer_archive::champ::save_container(map, ar);
+    std::tie(ar, map_id2) = immer_archive::champ::save_to_archive(map, ar);
 
     REQUIRE(map_id != map_id2);
 }
@@ -244,10 +244,10 @@ void test_table_types()
     const auto t1 = gen_table(T1{}, 0, 100);
     const auto t2 = gen_table(t1, 200, 210);
 
-    auto [ar, t1_id] = immer_archive::champ::save_container(t1, {});
+    auto [ar, t1_id] = immer_archive::champ::save_to_archive(t1, {});
 
     auto t2_id          = immer_archive::champ::node_id{};
-    std::tie(ar, t2_id) = immer_archive::champ::save_container(t2, ar);
+    std::tie(ar, t2_id) = immer_archive::champ::save_to_archive(t2, ar);
 
     const auto ar_str = to_json(ar);
     // REQUIRE(ar_str == "");
@@ -293,10 +293,10 @@ TEST_CASE("Test saving a table, no json")
     const auto t1 = gen_table(table_t{}, 0, 100);
     const auto t2 = gen_table(t1, 200, 210);
 
-    auto [ar, t1_id] = immer_archive::champ::save_container(t1, {});
+    auto [ar, t1_id] = immer_archive::champ::save_to_archive(t1, {});
 
     auto t2_id          = immer_archive::champ::node_id{};
-    std::tie(ar, t2_id) = immer_archive::champ::save_container(t2, ar);
+    std::tie(ar, t2_id) = immer_archive::champ::save_to_archive(t2, ar);
 
     const auto ar_str = to_json(ar);
     // REQUIRE(ar_str == "");

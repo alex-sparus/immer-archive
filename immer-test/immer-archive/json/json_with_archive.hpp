@@ -39,6 +39,11 @@ struct archives_save
     template <class T>
     auto& get_save_archive()
     {
+        using Contains = decltype(hana::contains(storage, hana::type_c<T>));
+        constexpr bool contains = hana::value<Contains>();
+        static_assert(contains,
+                      "There is no archive for the given type, check the "
+                      "get_archives_types function");
         return storage[hana::type_c<T>];
     }
 };

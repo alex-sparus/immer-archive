@@ -77,7 +77,7 @@ private:
 
 template <class Container>
 std::pair<container_archive_save<Container>, node_id>
-save_container(Container container, container_archive_save<Container> archive)
+save_to_archive(Container container, container_archive_save<Container> archive)
 {
     const auto& impl = container.impl();
     auto root_id     = node_id{};

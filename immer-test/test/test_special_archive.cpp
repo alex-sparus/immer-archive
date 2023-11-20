@@ -3,6 +3,7 @@
 #include <test/utils.hpp>
 
 #include <boost/hana.hpp>
+#include <immer-archive/champ/traits.hpp>
 #include <immer-archive/json/archivable.hpp>
 #include <immer-archive/json/json_with_archive.hpp>
 #include <immer-archive/rbts/vector.hpp>
@@ -24,8 +25,9 @@ struct test_data
     immer_archive::archivable<immer_archive::vector_one<std::string>> strings;
 
     immer_archive::archivable<immer_archive::flex_vector_one<int>> flex_ints;
+    immer_archive::archivable<immer::map<int, std::string>> map;
 
-    auto tie() const { return std::tie(ints, strings, flex_ints); }
+    auto tie() const { return std::tie(ints, strings, flex_ints, map); }
 
     friend bool operator==(const test_data& left, const test_data& right)
     {
@@ -38,7 +40,10 @@ struct test_data
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(CEREAL_NVP(ints), CEREAL_NVP(strings), CEREAL_NVP(flex_ints));
+        ar(CEREAL_NVP(ints),
+           CEREAL_NVP(strings),
+           CEREAL_NVP(flex_ints),
+           CEREAL_NVP(map));
     }
 };
 
@@ -54,7 +59,9 @@ inline auto get_archives_types(const test_data&)
         hana::make_pair(hana::type_c<immer_archive::vector_one<std::string>>,
                         BOOST_HANA_STRING("strings")),
         hana::make_pair(hana::type_c<immer_archive::flex_vector_one<int>>,
-                        BOOST_HANA_STRING("flex_ints"))
+                        BOOST_HANA_STRING("flex_ints")),
+        hana::make_pair(hana::type_c<immer::map<int, std::string>>,
+                        BOOST_HANA_STRING("int_string_map"))
 
     );
     return names;
@@ -74,6 +81,11 @@ TEST_CASE("Save with a special archive")
         .ints      = ints1,
         .strings   = {"one", "two"},
         .flex_ints = immer_archive::flex_vector_one<int>{ints1},
+        .map =
+            {
+                {1, "_one_"},
+                {2, "two__"},
+            },
     };
 
     const auto [json_str, archives] =
@@ -116,16 +128,22 @@ TEST_CASE("Save with a special archive")
 
 TEST_CASE("Save with a special archive, special type is enclosed")
 {
+    const auto map = immer::map<int, std::string>{
+        {1, "_one_"},
+        {2, "two__"},
+    };
     const auto ints1 = test::gen(test::example_vector{}, 3);
     const auto test1 = test_data{
         .ints      = ints1,
         .strings   = {"one", "two"},
         .flex_ints = immer_archive::flex_vector_one<int>{ints1},
+        .map       = map,
     };
     const auto test2 = test_data{
         .ints      = ints1,
         .strings   = {"three"},
         .flex_ints = immer_archive::flex_vector_one<int>{ints1},
+        .map       = map.set(3, "__three"),
     };
 
     // At the beginning, the vector is shared, it's the same data.
