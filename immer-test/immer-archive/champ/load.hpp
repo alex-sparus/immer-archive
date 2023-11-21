@@ -3,6 +3,8 @@
 #include <immer-archive/champ/archive.hpp>
 #include <immer-archive/node_ptr.hpp>
 
+#include <immer/flex_vector.hpp>
+
 #include <spdlog/spdlog.h>
 
 namespace immer_archive {
@@ -22,12 +24,14 @@ public:
     using node_ptr       = immer_archive::node_ptr<node_t>;
     using inner_node_ptr = immer_archive::inner_node_ptr<node_t>;
 
+    using values_t = immer::flex_vector<immer::array<T>>;
+
     explicit nodes_loader(nodes_load<T, B> archive)
         : archive_{std::move(archive)}
     {
     }
 
-    node_ptr load_collision(node_id id)
+    std::pair<node_ptr, values_t> load_collision(node_id id)
     {
         if (auto* p = collisions_.find(id)) {
             return *p;
@@ -35,7 +39,7 @@ public:
 
         auto* node_info = archive_.collisions.find(id);
         if (!node_info) {
-            return nullptr;
+            return {nullptr, {}};
         }
 
         const auto n = node_info->data.size();
@@ -44,19 +48,21 @@ public:
         immer::detail::uninitialized_copy(node_info->data.begin(),
                                           node_info->data.end(),
                                           node.get()->collisions());
-        collisions_ = std::move(collisions_).set(id, node);
-        return node;
+        auto result =
+            std::make_pair(std::move(node), values_t{node_info->data});
+        collisions_ = std::move(collisions_).set(id, result);
+        return result;
     }
 
-    node_ptr load_inner(node_id id)
+    std::pair<node_ptr, values_t> load_inner(node_id id)
     {
         if (auto* p = inners_.find(id)) {
-            return p->node;
+            return {p->first.node, p->second};
         }
 
         auto* node_info = archive_.inners.find(id);
         if (!node_info) {
-            return nullptr;
+            return {nullptr, {}};
         }
 
         const auto n  = node_info->children.size();
@@ -70,37 +76,48 @@ public:
         assert(inner.get()->children_count() == n);
         assert(inner.get()->data_count() == nv);
 
+        auto values = values_t{};
+
         // Values
         if (nv) {
             immer::detail::uninitialized_copy(node_info->values.data.begin(),
                                               node_info->values.data.end(),
                                               inner.get()->values());
+            values = std::move(values).push_back(node_info->values.data);
         }
 
         // Children
         auto children = immer::vector<node_ptr>{};
         auto index    = std::size_t{};
         for (const auto& child_node_id : node_info->children) {
-            auto child = load_some_node(child_node_id);
+            auto [child, child_values] = load_some_node(child_node_id);
             if (!child) {
                 throw std::invalid_argument{
                     fmt::format("Failed to load node ID {}", child_node_id)};
             }
+
+            if (!child_values.empty()) {
+                values = std::move(values) + child_values;
+            }
+
             auto* raw_ptr = child.get();
             children      = std::move(children).push_back(std::move(child));
             inner.get()->children()[index] = raw_ptr;
             ++index;
         }
 
-        inners_ = std::move(inners_).set(id,
-                                         inner_node_ptr{
-                                             .node     = inner,
-                                             .children = std::move(children),
-                                         });
-        return inner;
+        inners_ =
+            std::move(inners_).set(id,
+                                   std::make_pair(
+                                       inner_node_ptr{
+                                           .node     = inner,
+                                           .children = std::move(children),
+                                       },
+                                       values));
+        return {std::move(inner), std::move(values)};
     }
 
-    node_ptr load_some_node(node_id id)
+    std::pair<node_ptr, values_t> load_some_node(node_id id)
     {
         if (archive_.inners.count(id)) {
             return load_inner(id);
@@ -108,13 +125,13 @@ public:
         if (archive_.collisions.count(id)) {
             return load_collision(id);
         }
-        return nullptr;
+        return {nullptr, {}};
     }
 
 private:
     const nodes_load<T, B> archive_;
-    immer::map<node_id, node_ptr> collisions_;
-    immer::map<node_id, inner_node_ptr> inners_;
+    immer::map<node_id, std::pair<node_ptr, values_t>> collisions_;
+    immer::map<node_id, std::pair<inner_node_ptr, values_t>> inners_;
 };
 
 } // namespace champ

@@ -37,7 +37,16 @@ class container_loader
 {
     using champ_t = std::decay_t<decltype(std::declval<Container>().impl())>;
     using node_t  = typename champ_t::node_t;
+    using value_t = typename node_t::value_t;
     using traits  = node_traits<node_t>;
+
+    struct project_value_ptr
+    {
+        const value_t* operator()(const value_t& v) const noexcept
+        {
+            return &v;
+        }
+    };
 
 public:
     explicit container_loader(container_archive_load<Container> archive)
@@ -53,12 +62,35 @@ public:
             return std::nullopt;
         }
 
-        auto root = nodes_.load_inner(info->root);
+        auto [root, values] = nodes_.load_inner(info->root);
         if (!root) {
             return std::nullopt;
         }
 
         auto impl = champ_t{root.release(), info->size};
+
+        // Validate the loaded champ by ensuring that all elements can be
+        // found. This verifies the hash function is the same as used while
+        // saving it.
+        auto count = std::size_t{};
+        for (const auto& items : values) {
+            for (const auto& item : items) {
+                ++count;
+                const auto* p = impl.template get<
+                    project_value_ptr,
+                    immer::detail::constantly<const value_t*, nullptr>>(item);
+                if (!p) {
+                    // XXX Maybe provide an error
+                    return std::nullopt;
+                }
+                if (!(*p == item)) {
+                    return std::nullopt;
+                }
+            }
+        }
+        if (count != impl.size) {
+            return std::nullopt;
+        }
 
         // XXX This ctor is not public in immer.
         auto container = Container{std::move(impl)};

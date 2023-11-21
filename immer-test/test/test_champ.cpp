@@ -103,19 +103,36 @@ TEST_CASE("Test saving a set")
     const auto ar_str       = to_json(ar);
     // REQUIRE(ar_str == "");
 
-    const auto loaded_archive =
-        from_json<immer_archive::champ::container_archive_load<Container>>(
-            ar_str);
-    REQUIRE(loaded_archive.containers.size() == 1);
+    SECTION("Load with the correct hash")
+    {
+        const auto loaded_archive =
+            from_json<immer_archive::champ::container_archive_load<Container>>(
+                ar_str);
+        REQUIRE(loaded_archive.containers.size() == 1);
 
-    auto loader       = immer_archive::champ::container_loader{loaded_archive};
-    const auto loaded = loader.load(set_id);
-    REQUIRE(loaded.has_value());
-    REQUIRE(into_set(set).size() == set.size());
-    for (const auto& item : set) {
-        // This is the only thing that actually breaks if the hash of the loaded
-        // set is not the same as the hash function of the serialized set.
-        REQUIRE(loaded->count(item));
+        auto loader = immer_archive::champ::container_loader{loaded_archive};
+        const auto loaded = loader.load(set_id);
+        REQUIRE(loaded.has_value());
+        REQUIRE(into_set(set).size() == set.size());
+        for (const auto& item : set) {
+            // This is the only thing that actually breaks if the hash of the
+            // loaded set is not the same as the hash function of the serialized
+            // set.
+            REQUIRE(loaded->count(item));
+        }
+    }
+
+    SECTION("Load with a different hash")
+    {
+        using WrongContainer      = immer::set<std::string>;
+        const auto loaded_archive = from_json<
+            immer_archive::champ::container_archive_load<WrongContainer>>(
+            ar_str);
+        REQUIRE(loaded_archive.containers.size() == 1);
+
+        auto loader = immer_archive::champ::container_loader{loaded_archive};
+        const auto loaded = loader.load(set_id);
+        REQUIRE(loaded.has_value() == false);
     }
 }
 
@@ -174,20 +191,37 @@ TEST_CASE("Test saving a map")
     const auto ar_str       = to_json(ar);
     // REQUIRE(ar_str == "");
 
-    const auto loaded_archive =
-        from_json<immer_archive::champ::container_archive_load<Container>>(
-            ar_str);
-    REQUIRE(loaded_archive.containers.size() == 1);
+    SECTION("Load with the correct hash")
+    {
+        const auto loaded_archive =
+            from_json<immer_archive::champ::container_archive_load<Container>>(
+                ar_str);
+        REQUIRE(loaded_archive.containers.size() == 1);
 
-    auto loader       = immer_archive::champ::container_loader{loaded_archive};
-    const auto loaded = loader.load(map_id);
-    REQUIRE(loaded.has_value());
-    REQUIRE(into_map(map).size() == map.size());
-    for (const auto& [key, value] : map) {
-        // This is the only thing that actually breaks if the hash of the loaded
-        // map is not the same as the hash function of the serialized map.
-        REQUIRE(loaded->count(key));
-        REQUIRE(loaded.value()[key] == value);
+        auto loader = immer_archive::champ::container_loader{loaded_archive};
+        const auto loaded = loader.load(map_id);
+        REQUIRE(loaded.has_value());
+        REQUIRE(into_map(map).size() == map.size());
+        for (const auto& [key, value] : map) {
+            // This is the only thing that actually breaks if the hash of the
+            // loaded map is not the same as the hash function of the serialized
+            // map.
+            REQUIRE(loaded->count(key));
+            REQUIRE(loaded.value()[key] == value);
+        }
+    }
+
+    SECTION("Load with a different hash")
+    {
+        using WrongContainer      = immer::map<int, std::string>;
+        const auto loaded_archive = from_json<
+            immer_archive::champ::container_archive_load<WrongContainer>>(
+            ar_str);
+        REQUIRE(loaded_archive.containers.size() == 1);
+
+        auto loader = immer_archive::champ::container_loader{loaded_archive};
+        const auto loaded = loader.load(map_id);
+        REQUIRE(loaded.has_value() == false);
     }
 }
 
@@ -238,8 +272,8 @@ TEST_CASE("Test save mutated map")
 }
 
 namespace {
-template <class T1, class T2>
-void test_table_types()
+template <class T1, class T2, class Verify>
+void test_table_types(Verify&& verify)
 {
     const auto t1 = gen_table(T1{}, 0, 100);
     const auto t2 = gen_table(t1, 200, 210);
@@ -257,18 +291,9 @@ void test_table_types()
 
     auto loader = immer_archive::champ::container_loader{loaded_archive};
 
-    const auto check = [&loader](auto id, const auto& expected) {
+    const auto check = [&loader, &verify](auto id, const auto& expected) {
         const auto loaded = loader.load(id);
-        REQUIRE(loaded.has_value());
-
-        for (const auto& item : expected) {
-            INFO(item);
-            REQUIRE(loaded.value().count(item.id));
-            REQUIRE(loaded.value()[item.id] == item);
-        }
-        for (const auto& item : *loaded) {
-            REQUIRE(expected[item.id] == item);
-        }
+        verify(loaded, expected);
     };
 
     check(t1_id, t1);
@@ -282,9 +307,30 @@ TEST_CASE("Test saving a table")
         immer::table<test_value, immer::table_key_fn, broken_hash>;
     using table_t = immer::table<test_value>;
 
+    const auto verify_is_equal = [](const auto& loaded, const auto& expected) {
+        REQUIRE(loaded.has_value());
+
+        for (const auto& item : expected) {
+            INFO(item);
+            REQUIRE(loaded.value().count(item.id));
+            REQUIRE(loaded.value()[item.id] == item);
+        }
+        for (const auto& item : *loaded) {
+            REQUIRE(expected[item.id] == item);
+        }
+    };
+
     // Verify that saving and loading with customized hash works.
-    test_table_types<table_t, table_t>();
-    test_table_types<different_table_t, different_table_t>();
+    test_table_types<table_t, table_t>(verify_is_equal);
+    test_table_types<different_table_t, different_table_t>(verify_is_equal);
+
+    const auto verify_didnt_load = [](const auto& loaded,
+                                      const auto& expected) {
+        REQUIRE(loaded.has_value() == false);
+    };
+
+    test_table_types<different_table_t, table_t>(verify_didnt_load);
+    test_table_types<table_t, different_table_t>(verify_didnt_load);
 }
 
 TEST_CASE("Test saving a table, no json")
