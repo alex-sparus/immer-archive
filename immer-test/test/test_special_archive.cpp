@@ -19,6 +19,24 @@ namespace hana = boost::hana;
  * Some user data type that contains some vector_one_archivable, which should be
  * serialized in a special way.
  */
+struct meta
+{
+    immer_archive::archivable<immer_archive::vector_one<int>> ints;
+
+    auto tie() const { return std::tie(ints); }
+
+    friend bool operator==(const meta& left, const meta& right)
+    {
+        return left.tie() == right.tie();
+    }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(CEREAL_NVP(ints));
+    }
+};
+
 struct test_data
 {
     immer_archive::archivable<immer_archive::vector_one<int>> ints;
@@ -27,7 +45,9 @@ struct test_data
     immer_archive::archivable<immer_archive::flex_vector_one<int>> flex_ints;
     immer_archive::archivable<immer::map<int, std::string>> map;
 
-    auto tie() const { return std::tie(ints, strings, flex_ints, map); }
+    immer_archive::archivable<immer_archive::vector_one<meta>> metas;
+
+    auto tie() const { return std::tie(ints, strings, flex_ints, map, metas); }
 
     friend bool operator==(const test_data& left, const test_data& right)
     {
@@ -43,7 +63,8 @@ struct test_data
         ar(CEREAL_NVP(ints),
            CEREAL_NVP(strings),
            CEREAL_NVP(flex_ints),
-           CEREAL_NVP(map));
+           CEREAL_NVP(map),
+           CEREAL_NVP(metas));
     }
 };
 
@@ -61,7 +82,18 @@ inline auto get_archives_types(const test_data&)
         hana::make_pair(hana::type_c<immer_archive::flex_vector_one<int>>,
                         BOOST_HANA_STRING("flex_ints")),
         hana::make_pair(hana::type_c<immer::map<int, std::string>>,
-                        BOOST_HANA_STRING("int_string_map"))
+                        BOOST_HANA_STRING("int_string_map")),
+        hana::make_pair(hana::type_c<immer_archive::vector_one<meta>>,
+                        BOOST_HANA_STRING("metas"))
+
+    );
+    return names;
+}
+
+inline auto get_archives_types(const meta&)
+{
+    auto names = hana::make_map(hana::make_pair(
+        hana::type_c<immer_archive::vector_one<int>>, BOOST_HANA_STRING("ints"))
 
     );
     return names;
