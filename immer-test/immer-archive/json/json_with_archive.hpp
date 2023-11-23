@@ -130,6 +130,7 @@ auto to_json_with_archive(const T& serializable)
         auto ar =
             immer_archive::json_immer_output_archive<decltype(archives)>{os};
         ar(serializable);
+        ar.finalize();
         archives = ar.get_archives();
     }
     return std::make_pair(os.str(), std::move(archives));

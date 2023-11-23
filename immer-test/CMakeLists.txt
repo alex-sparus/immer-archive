@@ -12,8 +12,9 @@ find_package(spdlog REQUIRED)
 find_package(cereal REQUIRED)
 find_package(Catch2 REQUIRED)
 
-add_executable(MyExample test/test_vectors.cpp test/test_struct_with_archive.cpp
-                         test/test_special_archive.cpp test/test_champ.cpp)
+add_executable(
+  MyExample test/test_vectors.cpp test/test_struct_with_archive.cpp
+            test/test_special_archive.cpp test/test_champ.cpp)
 target_include_directories(MyExample PRIVATE immer .)
 target_link_libraries(MyExample PRIVATE spdlog::spdlog Catch2::Catch2WithMain)
 
@@ -28,6 +29,7 @@ target_compile_options(
           -Wno-c++20-designator
           -Wno-gnu-anonymous-struct
           -Wno-nested-anon-types
+          -Wno-unused-function
           # -Wno-nullability-extension -Wno-deprecated-declarations
 )
 

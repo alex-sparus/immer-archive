@@ -2,6 +2,9 @@
 
 #include <cereal/archives/json.hpp>
 
+// XXX not good here
+#include <immer-archive/rbts/archive.hpp>
+
 /**
  * Special types of archives, working with JSON, that support providing extra
  * context (ImmerArchives) to serialize immer data structures using
@@ -27,12 +30,13 @@ public:
     {
     }
 
-    ~json_immer_output_archive() { archive(CEREAL_NVP(archives)); }
+    ~json_immer_output_archive() {}
 
     void startNode() { archive.startNode(); }
     void writeName() { archive.writeName(); }
     void finishNode() { archive.finishNode(); }
     void setNextName(const char* name) { archive.setNextName(name); }
+    void makeArray() { archive.makeArray(); }
 
     template <class T>
     void saveValue(const T& value)
@@ -42,10 +46,38 @@ public:
 
     ImmerArchives& get_archives() { return archives; }
 
+    void finalize()
+    {
+        // Serializing the archive actually modifies the archive. This does not
+        // sound good!
+        // Because of that, serializing it like this does not work: later parts
+        // of the archive modify the earlier, already serialized parts. So
+        // either serialize twice, or more likely, this whole direction is not
+        // right.
+
+        auto& self = *this;
+        self(CEREAL_NVP(archives));
+    }
+
 private:
     cereal::JSONOutputArchive archive;
     ImmerArchives archives;
 };
+
+/**
+ * Define saving for leaf_node_save only in terms of the immer-archive-aware
+ * output_archive, because leaves data might still be the archivable types.
+ */
+template <class ImmerArchives, class T>
+void save(json_immer_output_archive<ImmerArchives>& ar,
+          const leaf_node_save<T>& value)
+{
+    ar(cereal::make_size_tag(
+        static_cast<cereal::size_type>(value.end - value.begin)));
+    for (auto p = value.begin; p != value.end; ++p) {
+        ar(*p);
+    }
+}
 
 template <class ImmerArchives>
 class json_immer_input_archive

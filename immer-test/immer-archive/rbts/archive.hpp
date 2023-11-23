@@ -171,15 +171,15 @@ archive_load<T> fix_leaf_nodes(archive_save<T> ar)
 /**
  * Serialization functions.
  */
-template <class Archive, class T>
-void save(Archive& ar, const leaf_node_save<T>& value)
-{
-    ar(cereal::make_size_tag(
-        static_cast<cereal::size_type>(value.end - value.begin)));
-    for (auto p = value.begin; p != value.end; ++p) {
-        ar(*p);
-    }
-}
+// template <class Archive, class T>
+// void save(Archive& ar, const leaf_node_save<T>& value)
+// {
+//     ar(cereal::make_size_tag(
+//         static_cast<cereal::size_type>(value.end - value.begin)));
+//     for (auto p = value.begin; p != value.end; ++p) {
+//         ar(*p);
+//     }
+// }
 
 template <class Archive, class T>
 void load(Archive& ar, leaf_node_load<T>& m)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <immer-archive/json/json_immer.hpp>
 #include <immer-archive/rbts/archive.hpp>
 
 #include <sstream>
@@ -25,7 +26,9 @@ std::string to_json(const T& serializable)
 {
     auto os = std::ostringstream{};
     {
-        auto ar = cereal::JSONOutputArchive{os};
+        auto archives = int{};
+        auto ar =
+            immer_archive::json_immer_output_archive<decltype(archives)>{os};
         ar(serializable);
     }
     return os.str();
