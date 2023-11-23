@@ -26,9 +26,7 @@ std::string to_json(const T& serializable)
 {
     auto os = std::ostringstream{};
     {
-        auto archives = int{};
-        auto ar =
-            immer_archive::json_immer_output_archive<decltype(archives)>{os};
+        auto ar = cereal::JSONOutputArchive{os};
         ar(serializable);
     }
     return os.str();

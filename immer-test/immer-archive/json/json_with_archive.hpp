@@ -53,6 +53,12 @@ struct archive_type_load
 {
     typename container_traits<Container>::load_archive_t archive;
     std::optional<typename container_traits<Container>::loader_t> loader;
+
+    template <class ArchivesLoad>
+    void inflate(ArchivesLoad& archives)
+    {
+        archive.inflate(archives);
+    }
 };
 
 template <class Storage, class Names>
@@ -72,6 +78,12 @@ struct archives_load
         return *load.loader;
     }
 
+    void inflate()
+    {
+        hana::for_each(hana::keys(storage),
+                       [&](auto key) { storage[key].inflate(*this); });
+    }
+
     template <class Archive>
     void load(Archive& ar)
     {
@@ -80,6 +92,8 @@ struct archives_load
             constexpr auto name = names_t{}[key];
             ar(cereal::make_nvp(name.c_str(), storage[key].archive));
         });
+
+        inflate();
     }
 };
 
@@ -130,8 +144,19 @@ auto to_json_with_archive(const T& serializable)
         auto ar =
             immer_archive::json_immer_output_archive<decltype(archives)>{os};
         ar(serializable);
-        ar.finalize();
         archives = ar.get_archives();
+
+        {
+            auto os2 = std::ostringstream{};
+            auto ar2 =
+                immer_archive::json_immer_output_archive<decltype(archives)>{
+                    archives, os2};
+            ar2(archives);
+            archives = ar2.get_archives();
+        }
+
+        ar.get_archives() = archives;
+        ar.finalize();
     }
     return std::make_pair(os.str(), std::move(archives));
 }

@@ -10,6 +10,8 @@
 #include <bnz/immer_map.hpp>
 #include <bnz/immer_vector.hpp>
 
+#include <boost/hana.hpp>
+
 namespace immer_archive {
 
 // Fixing BL to 1, because by default it depends on the sizeof(T)
@@ -119,6 +121,9 @@ struct archive_save
     immer::map<const void*, node_id> node_ptr_to_id;
 };
 
+template <class X>
+class Z;
+
 template <class T>
 struct archive_load
 {
@@ -127,6 +132,27 @@ struct archive_load
     immer::map<node_id, relaxed_inner_node> relaxed_inners;
     immer::map<node_id, vector_load<T>> vectors;
     immer::map<node_id, flex_vector_load<T>> flex_vectors;
+
+    template <class ArchivesLoad>
+    void inflate(ArchivesLoad& archives)
+    {
+        auto new_leaves = immer::map<node_id, leaf_node_load<T>>{};
+        for (const auto& [key, leaf] : leaves) {
+            constexpr auto has_inflate = boost::hana::is_valid(
+                [](auto&& x) -> decltype((void) x.inflate(archives)) {});
+            using ShouldInflate = decltype(has_inflate(std::declval<T>()));
+            // XXX ShouldInflate is not gonna work because there is the "meta"
+            // type in between and I don't want to require the custom types to
+            // implement something extra.
+            //
+            // Need to sort of call `load` again but with the given archives...
+            if constexpr (boost::hana::value<ShouldInflate>()) {
+                Z<T> q;
+            } else {
+                new_leaves = std::move(new_leaves).set(key, leaf);
+            }
+        }
+    }
 };
 
 // This is needed to be able to use the archive that was not read from JSON
@@ -171,15 +197,20 @@ archive_load<T> fix_leaf_nodes(archive_save<T> ar)
 /**
  * Serialization functions.
  */
-// template <class Archive, class T>
-// void save(Archive& ar, const leaf_node_save<T>& value)
-// {
-//     ar(cereal::make_size_tag(
-//         static_cast<cereal::size_type>(value.end - value.begin)));
-//     for (auto p = value.begin; p != value.end; ++p) {
-//         ar(*p);
-//     }
-// }
+template <
+    class Archive,
+    class T,
+    typename = std::enable_if_t<
+        cereal::traits::detail::count_output_serializers<T, Archive>::value !=
+        0>>
+void save(Archive& ar, const leaf_node_save<T>& value)
+{
+    ar(cereal::make_size_tag(
+        static_cast<cereal::size_type>(value.end - value.begin)));
+    for (auto p = value.begin; p != value.end; ++p) {
+        ar(*p);
+    }
+}
 
 template <class Archive, class T>
 void load(Archive& ar, leaf_node_load<T>& m)

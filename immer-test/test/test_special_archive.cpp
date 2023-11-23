@@ -35,6 +35,29 @@ struct meta
     {
         ar(CEREAL_NVP(ints));
     }
+
+    friend std::string to_string(const meta& value)
+    {
+        return to_string(value.ints);
+    }
+};
+
+struct test_data_debug
+{
+    immer_archive::vector_one<int> ints;
+    immer_archive::vector_one<std::string> strings;
+
+    immer_archive::flex_vector_one<int> flex_ints;
+    immer::map<int, std::string> map;
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(CEREAL_NVP(ints),
+           CEREAL_NVP(strings),
+           CEREAL_NVP(flex_ints),
+           CEREAL_NVP(map));
+    }
 };
 
 struct test_data
@@ -52,6 +75,17 @@ struct test_data
     friend bool operator==(const test_data& left, const test_data& right)
     {
         return left.tie() == right.tie();
+    }
+
+    friend std::ostream& operator<<(std::ostream& s, const test_data& value)
+    {
+        return s << test::to_json(test_data_debug{
+                        .ints      = value.ints.container,
+                        .strings   = value.strings.container,
+                        .flex_ints = value.flex_ints.container,
+                        .map       = value.map.container,
+                    })
+                 << "; metas = " << to_string(value.metas);
     }
 
     /**
@@ -164,13 +198,13 @@ TEST_CASE("Save with a special archive")
         //             .archive.leaves.size() == 2);
     }
 
-    REQUIRE(json_str == "");
+    // REQUIRE(json_str == "");
 
-    // {
-    //     auto full_load =
-    //         immer_archive::from_json_with_archive<test_data>(json_str);
-    //     REQUIRE(full_load == test1);
-    // }
+    {
+        auto full_load =
+            immer_archive::from_json_with_archive<test_data>(json_str);
+        REQUIRE(full_load == test1);
+    }
 }
 
 // TEST_CASE("Save with a special archive, special type is enclosed")

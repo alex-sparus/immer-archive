@@ -36,6 +36,11 @@ struct container_archive_load
 
     nodes_load<T, champ_t::bits> nodes;
     immer::map<node_id, champ_info> containers;
+
+    template <class ArchivesLoad>
+    void inflate(ArchivesLoad&)
+    {
+    }
 };
 
 template <class Container>

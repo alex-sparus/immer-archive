@@ -23,10 +23,16 @@ class json_immer_output_archive
     , public cereal::traits::TextArchive
 {
 public:
-    template <class... Args>
-    json_immer_output_archive(Args&&... args)
+    json_immer_output_archive(std::ostream& stream)
         : cereal::OutputArchive<json_immer_output_archive<ImmerArchives>>{this}
-        , archive{std::forward<Args>(args)...}
+        , archive{stream}
+    {
+    }
+
+    json_immer_output_archive(ImmerArchives archives, std::ostream& stream)
+        : cereal::OutputArchive<json_immer_output_archive<ImmerArchives>>{this}
+        , archive{stream}
+        , archives{std::move(archives)}
     {
     }
 
@@ -48,13 +54,6 @@ public:
 
     void finalize()
     {
-        // Serializing the archive actually modifies the archive. This does not
-        // sound good!
-        // Because of that, serializing it like this does not work: later parts
-        // of the archive modify the earlier, already serialized parts. So
-        // either serialize twice, or more likely, this whole direction is not
-        // right.
-
         auto& self = *this;
         self(CEREAL_NVP(archives));
     }
