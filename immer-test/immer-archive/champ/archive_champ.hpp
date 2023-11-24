@@ -41,6 +41,11 @@ struct container_archive_load
     void inflate(ArchivesLoad&)
     {
     }
+
+    friend std::string to_string(const container_archive_load& value)
+    {
+        return "container_archive_load";
+    }
 };
 
 template <class Container>

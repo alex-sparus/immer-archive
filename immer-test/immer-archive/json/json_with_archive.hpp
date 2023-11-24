@@ -51,7 +51,7 @@ struct archives_save
 template <class Container>
 struct archive_type_load
 {
-    typename container_traits<Container>::load_archive_t archive;
+    typename container_traits<Container>::load_archive_t archive = {};
     std::optional<typename container_traits<Container>::loader_t> loader;
 
     template <class ArchivesLoad>
@@ -75,13 +75,10 @@ struct archives_load
         if (!load.loader) {
             load.loader.emplace(load.archive);
         }
+        SPDLOG_INFO("archives_load.get_loader() {} {}",
+                    typeid(Container{}).name(),
+                    to_string(*this));
         return *load.loader;
-    }
-
-    void inflate()
-    {
-        hana::for_each(hana::keys(storage),
-                       [&](auto key) { storage[key].inflate(*this); });
     }
 
     template <class Archive>
@@ -92,8 +89,17 @@ struct archives_load
             constexpr auto name = names_t{}[key];
             ar(cereal::make_nvp(name.c_str(), storage[key].archive));
         });
+    }
 
-        inflate();
+    friend std::string to_string(const archives_load& value)
+    {
+        std::string result;
+        hana::for_each(hana::keys(value.storage), [&](auto key) {
+            constexpr auto name = names_t{}[key];
+            result += "\n" + std::string{name.c_str()} + ": " +
+                      to_string(value.storage[key].archive);
+        });
+        return result;
     }
 };
 
@@ -166,32 +172,34 @@ T from_json_with_archive(const std::string& input)
 {
     using Archives = decltype(detail::generate_archives_load(
         get_archives_types(std::declval<T>())));
-    auto archives  = Archives{};
+    auto ar1       = Archives{};
 
     SPDLOG_INFO("loading archive as json");
     {
-        auto is = std::istringstream{input};
-        auto ar = cereal::JSONInputArchive{is};
+        auto is        = std::istringstream{input};
+        auto ar        = cereal::JSONInputArchive{is};
+        auto& archives = ar1;
         ar(CEREAL_NVP(archives));
     }
-    SPDLOG_INFO("done loading archive as json");
+    SPDLOG_INFO("done loading archive as json, {}", to_string(ar1));
 
-    auto archives2 = Archives{};
+    auto ar2 = Archives{};
     SPDLOG_INFO("loading archive again");
     {
         auto is = std::istringstream{input};
-        auto ar =
-            immer_archive::json_immer_input_archive<Archives>{archives, is};
-        auto& archives = archives2;
+        auto ar = immer_archive::json_immer_input_archive<Archives>{ar1, is};
+        auto& archives = ar2;
         ar(CEREAL_NVP(archives));
     }
-    SPDLOG_INFO("done loading archive again");
+    SPDLOG_INFO("done loading archive again, {}", to_string(ar2));
 
     auto is = std::istringstream{input};
-    auto ar = immer_archive::json_immer_input_archive<Archives>{
-        std::move(archives2), is};
+    auto ar = immer_archive::json_immer_input_archive<Archives>{ar2, is};
+    SPDLOG_INFO("ar.get_archives() = {}", to_string(ar.get_archives()));
     auto r = T{};
+    SPDLOG_INFO("2 ar.get_archives() = {}", to_string(ar.get_archives()));
     ar(r);
+    SPDLOG_INFO("3 ar.get_archives() = {}", to_string(ar.get_archives()));
     SPDLOG_INFO("done loading the value");
     return r;
 }

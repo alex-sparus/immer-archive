@@ -38,7 +38,7 @@ struct meta
 
     friend std::string to_string(const meta& value)
     {
-        return to_string(value.ints);
+        return fmt::format("(meta {})", to_string(value.ints));
     }
 };
 

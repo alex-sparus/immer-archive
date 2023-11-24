@@ -58,11 +58,11 @@ else()
   target_compile_options(
     MyExample
     PRIVATE -O0 -fno-optimize-sibling-calls -g -fno-omit-frame-pointer
-            -fsanitize-coverage=trace-pc-guard -fsanitize=leak)
+            -fsanitize-coverage=trace-pc-guard -fsanitize=address)
   target_compile_definitions(MyExample PRIVATE BOOST_USE_ASAN=1)
   target_compile_definitions(MyExample
                              PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
-  target_link_options(MyExample PRIVATE -fsanitize=leak)
+  target_link_options(MyExample PRIVATE -fsanitize=address)
 endif()
 
 # Fuzz

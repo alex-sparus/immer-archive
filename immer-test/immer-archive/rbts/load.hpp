@@ -29,6 +29,10 @@ public:
 
     std::optional<vector_one<T, MemoryPolicy, B>> load_vector(node_id id)
     {
+        if (auto* v = vectors_.find(id)) {
+            return *v;
+        }
+
         auto* info = ar_.vectors.find(id);
         if (!info) {
             return std::nullopt;
@@ -49,7 +53,10 @@ public:
         impl.shift = info->rbts.shift;
         impl.root  = root.release();
         impl.tail  = tail.release();
-        return vector_one<T, MemoryPolicy, B>{std::move(impl)};
+
+        auto result = vector_one<T, MemoryPolicy, B>{std::move(impl)};
+        vectors_    = std::move(vectors_).set(id, result);
+        return result;
     }
 
     std::optional<flex_vector_one<T, MemoryPolicy, B>>
@@ -88,7 +95,11 @@ private:
         }
 
         const auto n = node_info->data.size();
-        auto leaf    = node_ptr{node_t::make_leaf_n(n),
+        SPDLOG_INFO("node_id {} has data [{}] identity {}",
+                    id,
+                    to_string(node_info->data),
+                    node_info->data.identity());
+        auto leaf = node_ptr{node_t::make_leaf_n(n),
                              [n](auto* ptr) { node_t::delete_leaf(ptr, n); }};
         immer::detail::uninitialized_copy(
             node_info->data.begin(), node_info->data.end(), leaf.get()->leaf());
@@ -188,6 +199,7 @@ private:
     const archive_load<T> ar_;
     immer::map<node_id, node_ptr> leaves_;
     immer::map<node_id, inner_node_ptr> inners_;
+    immer::map<node_id, vector_one<T, MemoryPolicy, B>> vectors_;
 };
 
 template <class T,

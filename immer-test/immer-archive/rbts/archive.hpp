@@ -12,6 +12,9 @@
 
 #include <boost/hana.hpp>
 
+#include <immer-archive/to_string.hpp>
+#include <spdlog/spdlog.h>
+
 namespace immer_archive {
 
 // Fixing BL to 1, because by default it depends on the sizeof(T)
@@ -34,6 +37,11 @@ template <class T>
 struct leaf_node_load
 {
     immer::array<T> data;
+
+    friend std::string to_string(const leaf_node_load& value)
+    {
+        return to_string(value.data);
+    }
 };
 
 template <class T>
@@ -136,22 +144,29 @@ struct archive_load
     template <class ArchivesLoad>
     void inflate(ArchivesLoad& archives)
     {
-        auto new_leaves = immer::map<node_id, leaf_node_load<T>>{};
-        for (const auto& [key, leaf] : leaves) {
-            constexpr auto has_inflate = boost::hana::is_valid(
-                [](auto&& x) -> decltype((void) x.inflate(archives)) {});
-            using ShouldInflate = decltype(has_inflate(std::declval<T>()));
-            // XXX ShouldInflate is not gonna work because there is the "meta"
-            // type in between and I don't want to require the custom types to
-            // implement something extra.
-            //
-            // Need to sort of call `load` again but with the given archives...
-            if constexpr (boost::hana::value<ShouldInflate>()) {
-                Z<T> q;
-            } else {
-                new_leaves = std::move(new_leaves).set(key, leaf);
-            }
-        }
+        // auto new_leaves = immer::map<node_id, leaf_node_load<T>>{};
+        // for (const auto& [key, leaf] : leaves) {
+        //     constexpr auto has_inflate = boost::hana::is_valid(
+        //         [](auto&& x) -> decltype((void) x.inflate(archives)) {});
+        //     using ShouldInflate = decltype(has_inflate(std::declval<T>()));
+        //     // XXX ShouldInflate is not gonna work because there is the
+        //     "meta"
+        //     // type in between and I don't want to require the custom types
+        //     to
+        //     // implement something extra.
+        //     //
+        //     // Need to sort of call `load` again but with the given
+        //     archives... if constexpr (boost::hana::value<ShouldInflate>()) {
+        //         Z<T> q;
+        //     } else {
+        //         new_leaves = std::move(new_leaves).set(key, leaf);
+        //     }
+        // }
+    }
+
+    friend std::string to_string(const archive_load& value)
+    {
+        return to_string(value.leaves);
     }
 };
 
@@ -223,6 +238,7 @@ void load(Archive& ar, leaf_node_load<T>& m)
         ar(x);
         m.data = std::move(m.data).push_back(std::move(x));
     }
+    SPDLOG_INFO("leaf_node_load has elements {}", to_string(m.data));
 }
 
 template <class Archive>
@@ -327,6 +343,7 @@ void load(Archive& ar, archive_load<T...>& value)
        CEREAL_NVP(relaxed_inners),
        CEREAL_NVP(vectors),
        CEREAL_NVP(flex_vectors));
+    SPDLOG_INFO("archive_load has leaves {}", to_string(leaves));
 }
 
 } // namespace immer_archive
