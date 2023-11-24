@@ -9,6 +9,8 @@ namespace immer_archive {
 
 inline std::string to_string(int val) { return fmt::format("{}", val); }
 
+inline std::string to_string(const std::string& str) { return str; }
+
 template <typename T,
           typename MemoryPolicy         = immer::default_memory_policy,
           immer::detail::rbts::bits_t B = immer::default_bits>
@@ -21,10 +23,34 @@ std::string to_string(const immer::vector<T, MemoryPolicy, B, 1>& value)
     return fmt::format("[{}]", fmt::join(str, ", "));
 }
 
+template <typename T,
+          typename MemoryPolicy         = immer::default_memory_policy,
+          immer::detail::rbts::bits_t B = immer::default_bits>
+std::string to_string(const immer::flex_vector<T, MemoryPolicy, B, 1>& value)
+{
+    std::vector<std::string> str;
+    for (const auto& item : value) {
+        str.push_back(to_string(item));
+    }
+    return fmt::format("[{}]", fmt::join(str, ", "));
+}
+
+template <typename K,
+          typename T,
+          typename Hash,
+          typename Equal,
+          typename MemoryPolicy,
+          immer::detail::hamts::bits_t B>
+std::string
+to_string(const immer::map<K, T, Hash, Equal, MemoryPolicy, B>& value)
+{
+    return "map not impl";
+}
+
 template <class Container>
 struct archivable
 {
-    Container container;
+    std::optional<Container> container;
     node_id container_id = {};
     bool needs_inflating = false;
 
@@ -40,6 +66,8 @@ struct archivable
     {
     }
 
+    Container get_or_default() const { return container.value_or(Container{}); }
+
     friend bool operator==(const archivable& left, const archivable& right)
     {
         return left.container == right.container;
@@ -49,7 +77,7 @@ struct archivable
     {
         return fmt::format(
             "(container = {}, container_id = {}, needs_inflating = {})",
-            to_string(value.container),
+            to_string(value.get_or_default()),
             value.container_id,
             value.needs_inflating);
     }
@@ -80,7 +108,7 @@ void save(json_immer_output_archive<ImmerArchives>& ar,
     auto& save_archive =
         ar.get_archives().template get_save_archive<Container>();
     auto [archive, id] =
-        save_to_archive(value.container, std::move(save_archive));
+        save_to_archive(value.container.value(), std::move(save_archive));
     save_archive = std::move(archive);
     ar(id);
 }
@@ -99,6 +127,10 @@ void load(json_immer_input_archive<ImmerArchives>& ar,
             "Failed to load a vector ID {} from the archive", vector_id)};
     }
     value = std::move(*vector);
+    SPDLOG_INFO("loaded inflated container ID {} [{}] {}",
+                vector_id,
+                immer_archive::to_string(value.container.value()),
+                typeid(Container{}).name());
 }
 
 template <class Archive, class Container>
@@ -108,6 +140,9 @@ void load(Archive& ar, archivable<Container>& value)
     ar(vector_id);
     value.container_id    = vector_id;
     value.needs_inflating = true;
+    SPDLOG_INFO("loaded uninflated container ID {} {}",
+                vector_id,
+                typeid(Container{}).name());
 }
 
 } // namespace immer_archive

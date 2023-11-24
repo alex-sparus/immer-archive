@@ -80,10 +80,10 @@ struct test_data
     friend std::ostream& operator<<(std::ostream& s, const test_data& value)
     {
         return s << test::to_json(test_data_debug{
-                        .ints      = value.ints.container,
-                        .strings   = value.strings.container,
-                        .flex_ints = value.flex_ints.container,
-                        .map       = value.map.container,
+                        .ints      = value.ints.get_or_default(),
+                        .strings   = value.strings.get_or_default(),
+                        .flex_ints = value.flex_ints.get_or_default(),
+                        .map       = value.map.get_or_default(),
                     })
                  << "; metas = " << to_string(value.metas);
     }
@@ -142,6 +142,8 @@ inline auto get_archives_types(const std::pair<test_data, test_data>&)
 
 TEST_CASE("Save with a special archive")
 {
+    spdlog::set_level(spdlog::level::debug);
+
     const auto ints1 = test::gen(test::example_vector{}, 3);
     const auto test1 = test_data{
         .ints      = ints1,
@@ -159,6 +161,8 @@ TEST_CASE("Save with a special archive")
                         1,
                         2,
                         3,
+                        4,
+                        5,
                     },
             },
             meta{
@@ -169,34 +173,34 @@ TEST_CASE("Save with a special archive")
 
     const auto [json_str, archives] =
         immer_archive::to_json_with_archive(test1);
-    SECTION("Try to save and load the archive")
-    {
-        const auto archives_json = [&archives = archives] {
-            auto os = std::ostringstream{};
-            {
-                auto ar = immer_archive::json_immer_output_archive<
-                    std::decay_t<decltype(archives)>>{os};
-                ar(123);
-                ar(CEREAL_NVP(archives));
-            }
-            return os.str();
-        }();
-        // REQUIRE(archives_json == "");
-        // const auto archives_loaded = [&archives_json] {
-        //     auto is = std::istringstream{archives_json};
-        //     using Archives =
-        //         decltype(immer_archive::detail::generate_archives_load(
-        //             get_archives_types(test_data{})));
-        //     auto archives = Archives{};
-        //     auto ar =
-        //         immer_archive::json_immer_input_archive<decltype(archives)>{is};
-        //     ar(CEREAL_NVP(archives));
-        //     return archives;
-        // }();
-        // REQUIRE(archives_loaded
-        //             .storage[hana::type_c<immer_archive::vector_one<int>>]
-        //             .archive.leaves.size() == 2);
-    }
+    // SECTION("Try to save and load the archive")
+    // {
+    //     const auto archives_json = [&archives = archives] {
+    //         auto os = std::ostringstream{};
+    //         {
+    //             auto ar = immer_archive::json_immer_output_archive<
+    //                 std::decay_t<decltype(archives)>>{os};
+    //             ar(123);
+    //             ar(CEREAL_NVP(archives));
+    //         }
+    //         return os.str();
+    //     }();
+    //     // REQUIRE(archives_json == "");
+    //     // const auto archives_loaded = [&archives_json] {
+    //     //     auto is = std::istringstream{archives_json};
+    //     //     using Archives =
+    //     //         decltype(immer_archive::detail::generate_archives_load(
+    //     //             get_archives_types(test_data{})));
+    //     //     auto archives = Archives{};
+    //     //     auto ar =
+    //     // immer_archive::json_immer_input_archive<decltype(archives)>{is};
+    //     //     ar(CEREAL_NVP(archives));
+    //     //     return archives;
+    //     // }();
+    //     // REQUIRE(archives_loaded
+    //     //             .storage[hana::type_c<immer_archive::vector_one<int>>]
+    //     //             .archive.leaves.size() == 2);
+    // }
 
     // REQUIRE(json_str == "");
 

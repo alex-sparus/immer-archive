@@ -168,17 +168,31 @@ T from_json_with_archive(const std::string& input)
         get_archives_types(std::declval<T>())));
     auto archives  = Archives{};
 
+    SPDLOG_INFO("loading archive as json");
     {
         auto is = std::istringstream{input};
         auto ar = cereal::JSONInputArchive{is};
         ar(CEREAL_NVP(archives));
     }
+    SPDLOG_INFO("done loading archive as json");
+
+    auto archives2 = Archives{};
+    SPDLOG_INFO("loading archive again");
+    {
+        auto is = std::istringstream{input};
+        auto ar =
+            immer_archive::json_immer_input_archive<Archives>{archives, is};
+        auto& archives = archives2;
+        ar(CEREAL_NVP(archives));
+    }
+    SPDLOG_INFO("done loading archive again");
 
     auto is = std::istringstream{input};
     auto ar = immer_archive::json_immer_input_archive<Archives>{
-        std::move(archives), is};
+        std::move(archives2), is};
     auto r = T{};
     ar(r);
+    SPDLOG_INFO("done loading the value");
     return r;
 }
 

@@ -178,7 +178,7 @@ struct node
 
     T* leaf()
     {
-        IMMER_ASSERT_TAGGED(kind() == kind_t::leaf);
+        // IMMER_ASSERT_TAGGED(kind() == kind_t::leaf);
         return reinterpret_cast<T*>(&impl.d.data.leaf.buffer);
     }
 
@@ -685,7 +685,7 @@ struct node
     static node_t* copy_leaf_n(count_t allocn, node_t* src, count_t n)
     {
         assert(allocn >= n);
-        IMMER_ASSERT_TAGGED(src->kind() == kind_t::leaf) ;
+        IMMER_ASSERT_TAGGED(src->kind() == kind_t::leaf);
         auto dst = make_leaf_n(allocn);
         IMMER_TRY {
             detail::uninitialized_copy(

@@ -95,6 +95,7 @@ public:
     void startNode() { archive.startNode(); }
     void finishNode() { archive.finishNode(); }
     void setNextName(const char* name) { archive.setNextName(name); }
+    void loadSize(cereal::size_type& size) { archive.loadSize(size); }
 
     template <class T>
     void loadValue(T& value)

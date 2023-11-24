@@ -122,7 +122,7 @@ struct archive_save
 };
 
 template <class X>
-class Z;
+struct Z;
 
 template <class T>
 struct archive_load
