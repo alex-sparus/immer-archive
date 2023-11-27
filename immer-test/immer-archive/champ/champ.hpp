@@ -4,6 +4,8 @@
 #include "load.hpp"
 #include "save.hpp"
 
+#include <optional>
+
 namespace immer_archive {
 namespace champ {
 
