@@ -67,7 +67,7 @@ public:
             return std::nullopt;
         }
 
-        auto impl = champ_t{root.release(), info->size};
+        auto impl = champ_t{std::move(root).release(), info->size};
 
         // Validate the loaded champ by ensuring that all elements can be
         // found. This verifies the hash function is the same as used while

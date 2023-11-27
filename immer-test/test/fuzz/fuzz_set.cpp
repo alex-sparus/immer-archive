@@ -1,7 +1,6 @@
 #include "fuzzer_input.hpp"
 
-#include <immer_champ_load.hpp>
-#include <immer_champ_save.hpp>
+#include <immer-archive/champ/champ.hpp>
 
 #include <test/utils.hpp>
 
@@ -82,25 +81,23 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
             auto ids          = std::vector<
                 std::pair<std::size_t, immer_archive::champ::node_id>>{};
             auto archive =
-                immer_archive::champ::set_archive_save<std::size_t,
-                                                       broken_hash,
-                                                       immer::default_bits>{};
+                immer_archive::champ::container_archive_save<set_t>{};
             for (auto index = std::size_t{}; index < var_count; ++index) {
                 if (bitset[index]) {
                     auto set_id = immer_archive::champ::node_id{};
                     std::tie(archive, set_id) =
-                        immer_archive::champ::save_set(vars[index], archive);
+                        immer_archive::champ::save_to_archive(vars[index],
+                                                              archive);
                     ids.emplace_back(index, set_id);
                 }
             }
 
-            auto loader =
-                immer_archive::champ::set_loader<std::size_t, broken_hash>{
-                    to_load_archive(archive)};
+            auto loader = immer_archive::champ::container_loader<set_t>{
+                to_load_archive(archive)};
 
             for (const auto& [index, set_id] : ids) {
                 const auto& set   = vars[index];
-                const auto loaded = loader.load_set(set_id);
+                const auto loaded = loader.load(set_id);
                 assert(loaded.has_value());
                 assert(into_set(*loaded) == into_set(set));
                 assert(into_set(set).size() == set.size());

@@ -17,6 +17,7 @@ public:
         SPDLOG_TRACE("ctor {} with ptr {}", (void*) this, (void*) ptr);
         // Assuming the node has just been created and not calling inc() on
         // it.
+        ptr->inc();
     }
 
     node_ptr(std::nullptr_t)
@@ -35,7 +36,7 @@ public:
     }
 
     node_ptr(node_ptr&& other)
-        : ptr{other.release()}
+        : ptr{std::move(other).release()}
         , deleter{other.deleter}
     {
         SPDLOG_TRACE("move ctor {} from {}", (void*) this, (void*) &other);
@@ -62,7 +63,7 @@ public:
 
     operator bool() const { return ptr; }
 
-    Node* release()
+    Node* release() &&
     {
         auto result = ptr;
         ptr         = nullptr;

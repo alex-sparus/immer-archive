@@ -51,7 +51,7 @@ struct archives_save
 template <class Container>
 struct archive_type_load
 {
-    typename container_traits<Container>::load_archive_t archive;
+    typename container_traits<Container>::load_archive_t archive = {};
     std::optional<typename container_traits<Container>::loader_t> loader;
 };
 
@@ -131,6 +131,18 @@ auto to_json_with_archive(const T& serializable)
             immer_archive::json_immer_output_archive<decltype(archives)>{os};
         ar(serializable);
         archives = ar.get_archives();
+
+        {
+            auto os2 = std::ostringstream{};
+            auto ar2 =
+                immer_archive::json_immer_output_archive<decltype(archives)>{
+                    archives, os2};
+            ar2(archives);
+            archives = ar2.get_archives();
+        }
+
+        ar.get_archives() = archives;
+        ar.finalize();
     }
     return std::make_pair(os.str(), std::move(archives));
 }
@@ -138,13 +150,20 @@ auto to_json_with_archive(const T& serializable)
 template <typename T>
 T from_json_with_archive(const std::string& input)
 {
-    using Archives = decltype(detail::generate_archives_load(
-        get_archives_types(std::declval<T>())));
+    using Archives = std::decay_t<decltype(detail::generate_archives_load(
+        get_archives_types(std::declval<T>())))>;
     auto archives  = Archives{};
 
     {
         auto is = std::istringstream{input};
         auto ar = cereal::JSONInputArchive{is};
+        ar(CEREAL_NVP(archives));
+    }
+
+    {
+        auto is = std::istringstream{input};
+        auto ar =
+            immer_archive::json_immer_input_archive<Archives>{archives, is};
         ar(CEREAL_NVP(archives));
     }
 

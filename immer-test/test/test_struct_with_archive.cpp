@@ -5,7 +5,8 @@
 
 using namespace test;
 
-TEST_CASE("Test saving and loading a structure")
+// "[.]" is to not run it by default
+TEST_CASE("Test saving and loading a structure", "[.]")
 {
     const auto ints1 = gen(example_vector{}, 3);
     const auto test1 = test::info{

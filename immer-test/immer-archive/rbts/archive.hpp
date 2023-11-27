@@ -171,7 +171,12 @@ archive_load<T> fix_leaf_nodes(archive_save<T> ar)
 /**
  * Serialization functions.
  */
-template <class Archive, class T>
+template <
+    class Archive,
+    class T,
+    typename = std::enable_if_t<
+        cereal::traits::detail::count_output_serializers<T, Archive>::value !=
+        0>>
 void save(Archive& ar, const leaf_node_save<T>& value)
 {
     ar(cereal::make_size_tag(

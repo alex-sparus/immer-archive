@@ -2,8 +2,6 @@
 
 #include <immer-archive/json/json_immer.hpp>
 
-#include <fmt/format.h>
-
 namespace immer_archive {
 
 template <class Container>
@@ -54,7 +52,14 @@ void load(json_immer_input_archive<ImmerArchives>& ar,
         throw ::cereal::Exception{fmt::format(
             "Failed to load a vector ID {} from the archive", vector_id)};
     }
-    value = std::move(*vector);
+    value.container = std::move(*vector);
+}
+
+template <class Archive, class Container>
+void load(Archive& ar, archivable<Container>& value)
+{
+    node_id vector_id;
+    ar(vector_id);
 }
 
 } // namespace immer_archive

@@ -20,19 +20,26 @@ class json_immer_output_archive
     , public cereal::traits::TextArchive
 {
 public:
-    template <class... Args>
-    json_immer_output_archive(Args&&... args)
+    json_immer_output_archive(std::ostream& stream)
         : cereal::OutputArchive<json_immer_output_archive<ImmerArchives>>{this}
-        , archive{std::forward<Args>(args)...}
+        , archive{stream}
     {
     }
 
-    ~json_immer_output_archive() { archive(CEREAL_NVP(archives)); }
+    json_immer_output_archive(ImmerArchives archives, std::ostream& stream)
+        : cereal::OutputArchive<json_immer_output_archive<ImmerArchives>>{this}
+        , archive{stream}
+        , archives{std::move(archives)}
+    {
+    }
+
+    ~json_immer_output_archive() {}
 
     void startNode() { archive.startNode(); }
     void writeName() { archive.writeName(); }
     void finishNode() { archive.finishNode(); }
     void setNextName(const char* name) { archive.setNextName(name); }
+    void makeArray() { archive.makeArray(); }
 
     template <class T>
     void saveValue(const T& value)
@@ -41,6 +48,12 @@ public:
     }
 
     ImmerArchives& get_archives() { return archives; }
+
+    void finalize()
+    {
+        auto& self = *this;
+        self(CEREAL_NVP(archives));
+    }
 
 private:
     cereal::JSONOutputArchive archive;
@@ -64,6 +77,7 @@ public:
     void startNode() { archive.startNode(); }
     void finishNode() { archive.finishNode(); }
     void setNextName(const char* name) { archive.setNextName(name); }
+    void loadSize(cereal::size_type& size) { archive.loadSize(size); }
 
     template <class T>
     void loadValue(T& value)

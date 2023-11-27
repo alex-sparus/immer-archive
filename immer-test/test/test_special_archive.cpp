@@ -37,6 +37,24 @@ struct meta
     }
 };
 
+struct test_data_debug
+{
+    immer_archive::vector_one<int> ints;
+    immer_archive::vector_one<std::string> strings;
+
+    immer_archive::flex_vector_one<int> flex_ints;
+    immer::map<int, std::string> map;
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(CEREAL_NVP(ints),
+           CEREAL_NVP(strings),
+           CEREAL_NVP(flex_ints),
+           CEREAL_NVP(map));
+    }
+};
+
 struct test_data
 {
     immer_archive::archivable<immer_archive::vector_one<int>> ints;
@@ -108,6 +126,8 @@ inline auto get_archives_types(const std::pair<test_data, test_data>&)
 
 TEST_CASE("Save with a special archive")
 {
+    spdlog::set_level(spdlog::level::debug);
+
     const auto ints1 = test::gen(test::example_vector{}, 3);
     const auto test1 = test_data{
         .ints      = ints1,
@@ -118,6 +138,21 @@ TEST_CASE("Save with a special archive")
                 {1, "_one_"},
                 {2, "two__"},
             },
+        .metas = {immer_archive::vector_one<meta>{
+            meta{
+                .ints =
+                    {
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                    },
+            },
+            meta{
+                .ints = ints1,
+            },
+        }},
     };
 
     const auto [json_str, archives] =
@@ -127,7 +162,8 @@ TEST_CASE("Save with a special archive")
         const auto archives_json = [&archives = archives] {
             auto os = std::ostringstream{};
             {
-                auto ar = cereal::JSONOutputArchive{os};
+                auto ar = immer_archive::json_immer_output_archive<
+                    std::decay_t<decltype(archives)>>{os};
                 ar(123);
                 ar(CEREAL_NVP(archives));
             }
@@ -135,18 +171,29 @@ TEST_CASE("Save with a special archive")
         }();
         // REQUIRE(archives_json == "");
         const auto archives_loaded = [&archives_json] {
-            auto is = std::istringstream{archives_json};
-            auto ar = cereal::JSONInputArchive{is};
             using Archives =
                 decltype(immer_archive::detail::generate_archives_load(
                     get_archives_types(test_data{})));
             auto archives = Archives{};
-            ar(CEREAL_NVP(archives));
+
+            {
+                auto is = std::istringstream{archives_json};
+                auto ar = cereal::JSONInputArchive{is};
+                ar(CEREAL_NVP(archives));
+            }
+
+            {
+                auto is = std::istringstream{archives_json};
+                auto ar = immer_archive::json_immer_input_archive<Archives>{
+                    archives, is};
+                ar(CEREAL_NVP(archives));
+            }
+
             return archives;
         }();
         REQUIRE(archives_loaded
                     .storage[hana::type_c<immer_archive::vector_one<int>>]
-                    .archive.leaves.size() == 2);
+                    .archive.leaves.size() == 5);
     }
 
     // REQUIRE(json_str == "");
@@ -155,6 +202,7 @@ TEST_CASE("Save with a special archive")
         auto full_load =
             immer_archive::from_json_with_archive<test_data>(json_str);
         REQUIRE(full_load == test1);
+        // REQUIRE(immer_archive::to_json_with_archive(full_load).first == "");
     }
 }
 
@@ -165,17 +213,39 @@ TEST_CASE("Save with a special archive, special type is enclosed")
         {2, "two__"},
     };
     const auto ints1 = test::gen(test::example_vector{}, 3);
+    const auto ints5 = immer_archive::vector_one<int>{
+        1,
+        2,
+        3,
+        4,
+        5,
+    };
+    const auto metas = immer_archive::vector_one<meta>{
+        meta{
+            .ints = ints5,
+        },
+        meta{
+            .ints = ints1,
+        },
+    };
     const auto test1 = test_data{
         .ints      = ints1,
         .strings   = {"one", "two"},
         .flex_ints = immer_archive::flex_vector_one<int>{ints1},
         .map       = map,
+        .metas     = metas,
     };
     const auto test2 = test_data{
         .ints      = ints1,
         .strings   = {"three"},
         .flex_ints = immer_archive::flex_vector_one<int>{ints1},
         .map       = map.set(3, "__three"),
+        .metas =
+            {
+                meta{
+                    .ints = ints5,
+                },
+            },
     };
 
     // At the beginning, the vector is shared, it's the same data.
@@ -185,32 +255,6 @@ TEST_CASE("Save with a special archive, special type is enclosed")
 
     const auto [json_str, archives] =
         immer_archive::to_json_with_archive(std::make_pair(test1, test2));
-    SECTION("Try to save and load the archive")
-    {
-        const auto archives_json = [&archives = archives] {
-            auto os = std::ostringstream{};
-            {
-                auto ar = cereal::JSONOutputArchive{os};
-                ar(123);
-                ar(CEREAL_NVP(archives));
-            }
-            return os.str();
-        }();
-        // REQUIRE(archives_json == "");
-        const auto archives_loaded = [&archives_json] {
-            auto is = std::istringstream{archives_json};
-            auto ar = cereal::JSONInputArchive{is};
-            using Archives =
-                decltype(immer_archive::detail::generate_archives_load(
-                    get_archives_types(test_data{})));
-            auto archives = Archives{};
-            ar(CEREAL_NVP(archives));
-            return archives;
-        }();
-        REQUIRE(archives_loaded
-                    .storage[hana::type_c<immer_archive::vector_one<int>>]
-                    .archive.leaves.size() == 2);
-    }
 
     // REQUIRE(json_str == "");
 
@@ -220,10 +264,17 @@ TEST_CASE("Save with a special archive, special type is enclosed")
         REQUIRE(loaded1 == test1);
         REQUIRE(loaded2 == test2);
 
+        REQUIRE(loaded1.metas.container.size() == 2);
+        REQUIRE(loaded1.metas.container[0].ints == ints5);
+        REQUIRE(loaded1.metas.container[1].ints == ints1);
+
         // After loading, two vectors are still reused.
         REQUIRE(loaded1.ints.container.identity() ==
                 loaded2.ints.container.identity());
         REQUIRE(loaded1.flex_ints.container.identity() ==
                 loaded2.flex_ints.container.identity());
+
+        REQUIRE(loaded1.metas.container[0].ints.container.identity() ==
+                loaded2.metas.container[0].ints.container.identity());
     }
 }

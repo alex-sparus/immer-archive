@@ -47,8 +47,8 @@ public:
         impl.dec();
         impl.size  = info->rbts.size;
         impl.shift = info->rbts.shift;
-        impl.root  = root.release();
-        impl.tail  = tail.release();
+        impl.root  = std::move(root).release();
+        impl.tail  = std::move(tail).release();
         return vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
@@ -70,8 +70,8 @@ public:
         impl.dec();
         impl.size  = info->rbts.size;
         impl.shift = info->rbts.shift;
-        impl.root  = root.release();
-        impl.tail  = tail.release();
+        impl.root  = std::move(root).release();
+        impl.tail  = std::move(tail).release();
         return flex_vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
