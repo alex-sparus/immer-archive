@@ -5,3 +5,5 @@ leak:cache_t::insert
 leak:realizeClassWithoutSwift
 leak:cereal::JSONInputArchive::Iterator::search
 leak:cereal::Exception::~Exception()
+leak:__lsan::CheckForLeaks
+leak:__sanitizer::Symbolizer::SymbolizePC

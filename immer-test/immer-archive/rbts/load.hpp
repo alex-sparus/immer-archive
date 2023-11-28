@@ -41,14 +41,11 @@ public:
         auto tail = load_leaf(info->rbts.tail);
         assert(root);
         assert(tail);
-        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{};
-        // XXX Hack: destroy the empty tree to later replace all the members.
-        // XXX add a way to construct it directly.
-        impl.dec();
-        impl.size  = info->rbts.size;
-        impl.shift = info->rbts.shift;
-        impl.root  = std::move(root).release();
-        impl.tail  = std::move(tail).release();
+        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{
+            info->rbts.size,
+            info->rbts.shift,
+            std::move(root).release(),
+            std::move(tail).release()};
         return vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
@@ -64,14 +61,11 @@ public:
         auto tail = load_leaf(info->rbts.tail);
         assert(root);
         assert(tail);
-        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{};
-        // XXX Hack: destroy the empty tree to later replace all the members.
-        // XXX add a way to construct it directly.
-        impl.dec();
-        impl.size  = info->rbts.size;
-        impl.shift = info->rbts.shift;
-        impl.root  = std::move(root).release();
-        impl.tail  = std::move(tail).release();
+        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{
+            info->rbts.size,
+            info->rbts.shift,
+            std::move(root).release(),
+            std::move(tail).release()};
         return flex_vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 

@@ -124,6 +124,37 @@ inline auto get_archives_types(const std::pair<test_data, test_data>&)
 
 } // namespace
 
+TEST_CASE("Special archive minimal test")
+{
+    const auto test1 = test_data{
+        .metas =
+            {
+                meta{
+                    .ints =
+                        {
+                            1,
+                            2,
+                            3,
+                            4,
+                            5,
+                        },
+                },
+            },
+    };
+
+    const auto [json_str, archives] =
+        immer_archive::to_json_with_archive(test1);
+
+    // REQUIRE(json_str == "");
+
+    {
+        auto full_load =
+            immer_archive::from_json_with_archive<test_data>(json_str);
+        REQUIRE(full_load == test1);
+        // REQUIRE(immer_archive::to_json_with_archive(full_load).first == "");
+    }
+}
+
 TEST_CASE("Save with a special archive")
 {
     spdlog::set_level(spdlog::level::debug);
