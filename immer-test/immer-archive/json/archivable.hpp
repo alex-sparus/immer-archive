@@ -25,6 +25,13 @@ struct archivable
     {
         return left.container == right.container;
     }
+
+    friend auto begin(const archivable& value)
+    {
+        return value.container.begin();
+    }
+
+    friend auto end(const archivable& value) { return value.container.end(); }
 };
 
 template <class ImmerArchives, class Container>

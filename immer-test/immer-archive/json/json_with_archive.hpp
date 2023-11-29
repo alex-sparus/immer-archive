@@ -53,6 +53,25 @@ struct archive_type_load
 {
     typename container_traits<Container>::load_archive_t archive = {};
     std::optional<typename container_traits<Container>::loader_t> loader;
+
+    archive_type_load() = default;
+
+    archive_type_load(const archive_type_load& other)
+        : archive{other.archive}
+    {
+    }
+
+    archive_type_load& operator=(const archive_type_load& other)
+    {
+        archive = other.archive;
+        return *this;
+    }
+
+    friend bool operator==(const archive_type_load& left,
+                           const archive_type_load& right)
+    {
+        return left.archive == right.archive;
+    }
 };
 
 template <class Storage, class Names>
@@ -80,6 +99,12 @@ struct archives_load
             constexpr auto name = names_t{}[key];
             ar(cereal::make_nvp(name.c_str(), storage[key].archive));
         });
+    }
+
+    friend bool operator==(const archives_load& left,
+                           const archives_load& right)
+    {
+        return left.storage == right.storage;
     }
 };
 
@@ -160,11 +185,21 @@ T from_json_with_archive(const std::string& input)
         ar(CEREAL_NVP(archives));
     }
 
-    {
+    const auto reload_archive = [&] {
         auto is = std::istringstream{input};
         auto ar =
             immer_archive::json_immer_input_archive<Archives>{archives, is};
         ar(CEREAL_NVP(archives));
+    };
+
+    auto prev = archives;
+    while (true) {
+        // Keep reloading until everything is loaded.
+        reload_archive();
+        if (prev == archives) {
+            break;
+        }
+        prev = archives;
     }
 
     auto is = std::istringstream{input};

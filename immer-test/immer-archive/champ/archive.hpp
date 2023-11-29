@@ -23,6 +23,13 @@ struct champ_info
 {
     node_id root;
     std::size_t size;
+
+    auto tie() const { return std::tie(root, size); }
+
+    friend bool operator==(const champ_info& left, const champ_info& right)
+    {
+        return left.tie() == right.tie();
+    }
 };
 
 template <class T>
@@ -36,6 +43,11 @@ template <class T>
 struct values_load
 {
     immer::array<T> data;
+
+    friend bool operator==(const values_load& left, const values_load& right)
+    {
+        return left.data == right.data;
+    }
 };
 
 template <class T, immer::detail::hamts::bits_t B>
@@ -58,6 +70,14 @@ struct inner_node_load
     immer::vector<node_id> children;
     bitmap_t nodemap;
     bitmap_t datamap;
+
+    auto tie() const { return std::tie(values, children, nodemap, datamap); }
+
+    friend bool operator==(const inner_node_load& left,
+                           const inner_node_load& right)
+    {
+        return left.tie() == right.tie();
+    }
 };
 
 template <class T, immer::detail::hamts::bits_t B>
@@ -74,6 +94,13 @@ struct nodes_load
 {
     immer::map<node_id, inner_node_load<T, B>> inners;
     immer::map<node_id, values_load<T>> collisions;
+
+    auto tie() const { return std::tie(inners, collisions); }
+
+    friend bool operator==(const nodes_load& left, const nodes_load& right)
+    {
+        return left.tie() == right.tie();
+    }
 };
 
 template <class T, immer::detail::hamts::bits_t B>

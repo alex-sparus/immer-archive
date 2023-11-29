@@ -36,6 +36,14 @@ struct container_archive_load
 
     nodes_load<T, champ_t::bits> nodes;
     immer::map<node_id, champ_info> containers;
+
+    auto tie() const { return std::tie(nodes, containers); }
+
+    friend bool operator==(const container_archive_load& left,
+                           const container_archive_load& right)
+    {
+        return left.tie() == right.tie();
+    }
 };
 
 template <class Container>

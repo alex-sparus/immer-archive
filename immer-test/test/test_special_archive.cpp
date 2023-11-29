@@ -11,6 +11,8 @@
 // to save std::pair
 #include <cereal/types/utility.hpp>
 
+#include <boost/hana/ext/std/tuple.hpp>
+
 namespace {
 
 namespace hana = boost::hana;
@@ -19,13 +21,13 @@ namespace hana = boost::hana;
  * Some user data type that contains some vector_one_archivable, which should be
  * serialized in a special way.
  */
-struct meta
+struct meta_meta
 {
     immer_archive::archivable<immer_archive::vector_one<int>> ints;
 
     auto tie() const { return std::tie(ints); }
 
-    friend bool operator==(const meta& left, const meta& right)
+    friend bool operator==(const meta_meta& left, const meta_meta& right)
     {
         return left.tie() == right.tie();
     }
@@ -37,21 +39,22 @@ struct meta
     }
 };
 
-struct test_data_debug
+struct meta
 {
-    immer_archive::vector_one<int> ints;
-    immer_archive::vector_one<std::string> strings;
+    immer_archive::archivable<immer_archive::vector_one<int>> ints;
+    immer_archive::archivable<immer_archive::vector_one<meta_meta>> metas;
 
-    immer_archive::flex_vector_one<int> flex_ints;
-    immer::map<int, std::string> map;
+    auto tie() const { return std::tie(ints, metas); }
+
+    friend bool operator==(const meta& left, const meta& right)
+    {
+        return left.tie() == right.tie();
+    }
 
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(CEREAL_NVP(ints),
-           CEREAL_NVP(strings),
-           CEREAL_NVP(flex_ints),
-           CEREAL_NVP(map));
+        ar(CEREAL_NVP(ints), CEREAL_NVP(metas));
     }
 };
 
@@ -102,7 +105,9 @@ inline auto get_archives_types(const test_data&)
         hana::make_pair(hana::type_c<immer::map<int, std::string>>,
                         BOOST_HANA_STRING("int_string_map")),
         hana::make_pair(hana::type_c<immer_archive::vector_one<meta>>,
-                        BOOST_HANA_STRING("metas"))
+                        BOOST_HANA_STRING("metas")),
+        hana::make_pair(hana::type_c<immer_archive::vector_one<meta_meta>>,
+                        BOOST_HANA_STRING("meta_metas"))
 
     );
     return names;
@@ -122,21 +127,68 @@ inline auto get_archives_types(const std::pair<test_data, test_data>&)
     return get_archives_types(test_data{});
 }
 
+template <class T>
+std::string string_via_tie(const T& value)
+{
+    std::string result;
+    hana::for_each(value.tie(), [&](const auto& item) {
+        using Item = std::decay_t<decltype(item)>;
+        result += (result.empty() ? "" : ", ") +
+                  Catch::StringMaker<Item>::convert(item);
+    });
+    return result;
+}
+
 } // namespace
+
+namespace Catch {
+template <>
+struct StringMaker<test_data>
+{
+    static std::string convert(const test_data& value)
+    {
+        return string_via_tie(value);
+    }
+};
+
+template <>
+struct StringMaker<meta>
+{
+    static std::string convert(const meta& value)
+    {
+        return string_via_tie(value);
+    }
+};
+
+template <>
+struct StringMaker<meta_meta>
+{
+    static std::string convert(const meta_meta& value)
+    {
+        return string_via_tie(value);
+    }
+};
+} // namespace Catch
 
 TEST_CASE("Special archive minimal test")
 {
+    const auto ints1 = immer_archive::vector_one<int>{
+        1,
+        2,
+        3,
+        4,
+        5,
+    };
     const auto test1 = test_data{
         .metas =
             {
                 meta{
-                    .ints =
+                    .ints = ints1,
+                    .metas =
                         {
-                            1,
-                            2,
-                            3,
-                            4,
-                            5,
+                            meta_meta{
+                                .ints = ints1,
+                            },
                         },
                 },
             },

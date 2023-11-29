@@ -32,6 +32,12 @@ template <class T>
 struct leaf_node_load
 {
     immer::array<T> data;
+
+    friend bool operator==(const leaf_node_load& left,
+                           const leaf_node_load& right)
+    {
+        return left.data == right.data;
+    }
 };
 
 template <class T>
@@ -44,17 +50,36 @@ struct leaf_node_save
 struct inner_node
 {
     immer::vector<node_id> children;
+
+    friend bool operator==(const inner_node& left, const inner_node& right)
+    {
+        return left.children == right.children;
+    }
 };
 
 struct relaxed_child
 {
     node_id node;
     std::size_t size;
+
+    auto tie() const { return std::tie(node, size); }
+
+    friend bool operator==(const relaxed_child& left,
+                           const relaxed_child& right)
+    {
+        return left.tie() == right.tie();
+    }
 };
 
 struct relaxed_inner_node
 {
     immer::vector<relaxed_child> children;
+
+    friend bool operator==(const relaxed_inner_node& left,
+                           const relaxed_inner_node& right)
+    {
+        return left.children == right.children;
+    }
 };
 
 struct rbts_info
@@ -63,6 +88,13 @@ struct rbts_info
     node_id tail;
     std::size_t size;
     immer::detail::rbts::shift_t shift;
+
+    auto tie() const { return std::tie(root, tail, size, shift); }
+
+    friend bool operator==(const rbts_info& left, const rbts_info& right)
+    {
+        return left.tie() == right.tie();
+    }
 };
 
 struct rbts_id
@@ -90,6 +122,11 @@ template <class T>
 struct vector_load
 {
     rbts_info rbts;
+
+    friend bool operator==(const vector_load& left, const vector_load& right)
+    {
+        return left.rbts == right.rbts;
+    }
 };
 
 template <class T>
@@ -104,6 +141,12 @@ template <class T>
 struct flex_vector_load
 {
     rbts_info rbts;
+
+    friend bool operator==(const flex_vector_load& left,
+                           const flex_vector_load& right)
+    {
+        return left.rbts == right.rbts;
+    }
 };
 
 template <class T>
@@ -127,6 +170,16 @@ struct archive_load
     immer::map<node_id, relaxed_inner_node> relaxed_inners;
     immer::map<node_id, vector_load<T>> vectors;
     immer::map<node_id, flex_vector_load<T>> flex_vectors;
+
+    auto tie() const
+    {
+        return std::tie(leaves, inners, relaxed_inners, vectors, flex_vectors);
+    }
+
+    friend bool operator==(const archive_load& left, const archive_load& right)
+    {
+        return left.tie() == right.tie();
+    }
 };
 
 // This is needed to be able to use the archive that was not read from JSON
