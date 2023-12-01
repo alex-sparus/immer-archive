@@ -22,30 +22,6 @@ const auto gen_map = [](auto map, int count) {
     return map;
 };
 
-struct test_value
-{
-    std::size_t id;
-    std::string value;
-
-    auto tie() const { return std::tie(id, value); }
-
-    template <class Archive>
-    void serialize(Archive& ar)
-    {
-        ar(CEREAL_NVP(id), CEREAL_NVP(value));
-    }
-
-    friend bool operator==(const test_value& left, const test_value& right)
-    {
-        return left.tie() == right.tie();
-    }
-
-    friend std::ostream& operator<<(std::ostream& s, const test_value& value)
-    {
-        return s << fmt::format("({}, {})", value.id, value.value);
-    }
-};
-
 auto gen_table(auto table, std::size_t from, std::size_t to)
 {
     for (auto i = std::min(from, to); i < std::max(from, to); ++i) {

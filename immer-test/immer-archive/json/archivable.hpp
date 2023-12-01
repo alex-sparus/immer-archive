@@ -50,23 +50,25 @@ template <class ImmerArchives, class Container>
 void load(json_immer_input_archive<ImmerArchives>& ar,
           archivable<Container>& value)
 {
-    node_id vector_id;
-    ar(vector_id);
+    using container_id = typename container_traits<Container>::container_id;
+    auto id            = container_id{};
+    ar(id);
 
-    auto& loader = ar.get_archives().template get_loader<Container>();
-    auto vector  = loader.load(vector_id);
-    if (!vector) {
+    auto& loader   = ar.get_archives().template get_loader<Container>();
+    auto container = loader.load(id);
+    if (!container) {
         throw ::cereal::Exception{fmt::format(
-            "Failed to load a vector ID {} from the archive", vector_id)};
+            "Failed to load a container ID {} from the archive", id)};
     }
-    value.container = std::move(*vector);
+    value.container = std::move(*container);
 }
 
 template <class Archive, class Container>
 void load(Archive& ar, archivable<Container>& value)
 {
-    node_id vector_id;
-    ar(vector_id);
+    using container_id = typename container_traits<Container>::container_id;
+    auto id            = container_id{};
+    ar(id);
 }
 
 } // namespace immer_archive

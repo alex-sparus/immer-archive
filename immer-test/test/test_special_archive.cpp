@@ -21,11 +21,15 @@ namespace hana = boost::hana;
  * Some user data type that contains some vector_one_archivable, which should be
  * serialized in a special way.
  */
+
+using test::test_value;
+
 struct meta_meta
 {
     immer_archive::archivable<immer_archive::vector_one<int>> ints;
+    immer_archive::archivable<immer::table<test_value>> table;
 
-    auto tie() const { return std::tie(ints); }
+    auto tie() const { return std::tie(ints, table); }
 
     friend bool operator==(const meta_meta& left, const meta_meta& right)
     {
@@ -35,7 +39,7 @@ struct meta_meta
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(CEREAL_NVP(ints));
+        ar(CEREAL_NVP(ints), CEREAL_NVP(table));
     }
 };
 
@@ -107,7 +111,9 @@ inline auto get_archives_types(const test_data&)
         hana::make_pair(hana::type_c<immer_archive::vector_one<meta>>,
                         BOOST_HANA_STRING("metas")),
         hana::make_pair(hana::type_c<immer_archive::vector_one<meta_meta>>,
-                        BOOST_HANA_STRING("meta_metas"))
+                        BOOST_HANA_STRING("meta_metas")),
+        hana::make_pair(hana::type_c<immer::table<test_value>>,
+                        BOOST_HANA_STRING("table_test_value"))
 
     );
     return names;

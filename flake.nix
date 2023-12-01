@@ -40,6 +40,7 @@
           our_llvm.bintools-unwrapped
         ];
       };
-      qwe = pkgs;
+
+      defaultPackage = pkgs.callPackage ./derivation.nix {stdenv = our_llvm.stdenv;};
     });
 }

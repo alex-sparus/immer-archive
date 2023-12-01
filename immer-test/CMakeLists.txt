@@ -8,6 +8,8 @@ project(
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(TESTS_WITH_LEAK_SANITIZER "enable leak sanitizer for tests" yes)
+
 find_package(spdlog REQUIRED)
 find_package(cereal REQUIRED)
 find_package(Catch2 REQUIRED)
@@ -55,14 +57,16 @@ elseif(LINUX)
 else()
   # macOS but not Xcode ninja && ASAN_OPTIONS=detect_leaks=1
   # LSAN_OPTIONS=suppressions=../suppr.txt ./MyExample
-  target_compile_options(
-    MyExample
-    PRIVATE -O0 -fno-optimize-sibling-calls -g -fno-omit-frame-pointer
-            -fsanitize-coverage=trace-pc-guard -fsanitize=leak)
+  target_compile_options(MyExample PRIVATE -O0 -fno-optimize-sibling-calls -g
+                                           -fno-omit-frame-pointer)
+  if(TESTS_WITH_LEAK_SANITIZER)
+    target_compile_options(MyExample PRIVATE -fsanitize-coverage=trace-pc-guard
+                                             -fsanitize=leak)
+    target_link_options(MyExample PRIVATE -fsanitize=leak)
+  endif()
   target_compile_definitions(MyExample PRIVATE BOOST_USE_ASAN=1)
   target_compile_definitions(MyExample
                              PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
-  target_link_options(MyExample PRIVATE -fsanitize=leak)
 endif()
 
 # Fuzz
@@ -84,5 +88,13 @@ target_compile_options(
           -Wno-c++20-designator
           -Wno-gnu-anonymous-struct
           -Wno-nested-anon-types
+          -Wno-unused-variable
           # -Wno-nullability-extension -Wno-deprecated-declarations
 )
+
+include(GNUInstallDirs)
+install(DIRECTORY immer-archive bnz DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+include(CTest)
+include(Catch)
+# catch_discover_tests(MyExample)
