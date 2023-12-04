@@ -16,6 +16,13 @@ namespace detail {
 namespace hana = boost::hana;
 
 /**
+ * Unimplemented class to generate a compile-time error and show what the type T
+ * is.
+ */
+template <class T>
+class error_no_archive_for_the_given_type_check_get_archives_types_function;
+
+/**
  * Archives and functions to serialize types that contain immer-archivable data
  * structures.
  */
@@ -41,9 +48,11 @@ struct archives_save
     {
         using Contains = decltype(hana::contains(storage, hana::type_c<T>));
         constexpr bool contains = hana::value<Contains>();
-        static_assert(contains,
-                      "There is no archive for the given type, check the "
-                      "get_archives_types function");
+        if constexpr (!contains) {
+            auto err =
+                error_no_archive_for_the_given_type_check_get_archives_types_function<
+                    T>{};
+        }
         return storage[hana::type_c<T>];
     }
 };
@@ -142,6 +151,20 @@ inline auto generate_archives_load(auto type_names)
 
 } // namespace detail
 
+template <class T>
+auto get_archives_types(const T&)
+{
+    return boost::hana::make_map();
+}
+
+template <class Archives>
+constexpr bool is_archive_empty(const Archives& archives)
+{
+    using Result =
+        decltype(boost::hana::is_empty(boost::hana::keys(archives.storage)));
+    return boost::hana::value<Result>();
+}
+
 /**
  * Type T must provide a callable free function get_archives_types(const T&).
  */
@@ -167,7 +190,9 @@ auto to_json_with_archive(const T& serializable)
         }
 
         ar.get_archives() = archives;
-        ar.finalize();
+        if constexpr (!is_archive_empty(archives)) {
+            ar.finalize();
+        }
     }
     return std::make_pair(os.str(), std::move(archives));
 }
@@ -179,27 +204,29 @@ T from_json_with_archive(const std::string& input)
         get_archives_types(std::declval<T>())))>;
     auto archives  = Archives{};
 
-    {
-        auto is = std::istringstream{input};
-        auto ar = cereal::JSONInputArchive{is};
-        ar(CEREAL_NVP(archives));
-    }
-
-    const auto reload_archive = [&] {
-        auto is = std::istringstream{input};
-        auto ar =
-            immer_archive::json_immer_input_archive<Archives>{archives, is};
-        ar(CEREAL_NVP(archives));
-    };
-
-    auto prev = archives;
-    while (true) {
-        // Keep reloading until everything is loaded.
-        reload_archive();
-        if (prev == archives) {
-            break;
+    if constexpr (!is_archive_empty(archives)) {
+        {
+            auto is = std::istringstream{input};
+            auto ar = cereal::JSONInputArchive{is};
+            ar(CEREAL_NVP(archives));
         }
-        prev = archives;
+
+        const auto reload_archive = [&] {
+            auto is = std::istringstream{input};
+            auto ar =
+                immer_archive::json_immer_input_archive<Archives>{archives, is};
+            ar(CEREAL_NVP(archives));
+        };
+
+        auto prev = archives;
+        while (true) {
+            // Keep reloading until everything is loaded.
+            reload_archive();
+            if (prev == archives) {
+                break;
+            }
+            prev = archives;
+        }
     }
 
     auto is = std::istringstream{input};

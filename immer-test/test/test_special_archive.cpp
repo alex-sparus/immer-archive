@@ -126,15 +126,6 @@ inline auto get_archives_types(const test_data&)
     return names;
 }
 
-inline auto get_archives_types(const meta&)
-{
-    auto names = hana::make_map(hana::make_pair(
-        hana::type_c<immer_archive::vector_one<int>>, BOOST_HANA_STRING("ints"))
-
-    );
-    return names;
-}
-
 inline auto get_archives_types(const std::pair<test_data, test_data>&)
 {
     return get_archives_types(test_data{});
@@ -376,5 +367,22 @@ TEST_CASE("Save with a special archive, special type is enclosed")
 
         REQUIRE(loaded1.metas.container[0].ints.container.identity() ==
                 loaded2.metas.container[0].ints.container.identity());
+    }
+}
+
+TEST_CASE("Special archive must load and save types that have no archive")
+{
+    const auto val1  = test_value{123, "value1"};
+    const auto val2  = test_value{234, "value2"};
+    const auto value = std::make_pair(val1, val2);
+
+    const auto json_archive_str =
+        immer_archive::to_json_with_archive(value).first;
+    REQUIRE(json_archive_str == test::to_json(value));
+
+    {
+        auto loaded = immer_archive::from_json_with_archive<
+            std::decay_t<decltype(value)>>(json_archive_str);
+        REQUIRE(loaded == value);
     }
 }
