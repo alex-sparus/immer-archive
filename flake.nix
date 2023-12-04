@@ -8,6 +8,10 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
+    arximboldi-cereal-src = {
+      url = "github:arximboldi/cereal";
+      flake = false;
+    };
   };
 
   outputs = {
@@ -15,6 +19,7 @@
     nixpkgs,
     flake-utils,
     flake-compat,
+    arximboldi-cereal-src,
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
@@ -23,6 +28,25 @@
         ln -s ${pkgs.llvmPackages_16.clang-unwrapped}/bin/clang-format $out/bin/
       '';
       our_llvm = pkgs.llvmPackages_14;
+
+      cereal-derivation = {
+        stdenv,
+        cmake,
+        lib,
+      }:
+        stdenv.mkDerivation rec {
+          name = "cereal-${version}";
+          version = "git-${commit}";
+          commit = arximboldi-cereal-src.rev;
+          src = arximboldi-cereal-src;
+          nativeBuildInputs = [cmake];
+          cmakeFlags = ["-DJUST_INSTALL_CEREAL=true"];
+          meta = {
+            homepage = "http://uscilab.github.io/cereal";
+            description = "A C++11 library for serialization";
+            license = lib.licenses.bsd3;
+          };
+        };
     in rec {
       devShell = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
         packages = with pkgs; [
@@ -31,7 +55,7 @@
           cmake
           ninja
           spdlog
-          cereal
+          arximboldi-cereal
           fmt_9
           catch2_3
           boost
@@ -40,6 +64,8 @@
           our_llvm.bintools-unwrapped
         ];
       };
+
+      arximboldi-cereal = pkgs.callPackage cereal-derivation {};
 
       defaultPackage = pkgs.callPackage ./derivation.nix {stdenv = our_llvm.stdenv;};
     });

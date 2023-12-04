@@ -28,7 +28,7 @@ stdenv.mkDerivation rec {
   doCheck = false;
 
   # Currently, the code has a memory leak
-  cmakeFlags = ["-DTESTS_WITH_LEAK_SANITIZER=OFF"];
+  cmakeFlags = ["-DTESTS_WITH_LEAK_SANITIZER=OFF" "-DBUILD_TESTS=OFF"];
 
   nativeBuildInputs = [ninja cmake];
 }

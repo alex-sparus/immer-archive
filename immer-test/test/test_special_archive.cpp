@@ -72,7 +72,13 @@ struct test_data
 
     immer_archive::archivable<immer_archive::vector_one<meta>> metas;
 
-    auto tie() const { return std::tie(ints, strings, flex_ints, map, metas); }
+    // Also test having meta directly, not inside an archivable type
+    meta single_meta;
+
+    auto tie() const
+    {
+        return std::tie(ints, strings, flex_ints, map, metas, single_meta);
+    }
 
     friend bool operator==(const test_data& left, const test_data& right)
     {
@@ -89,7 +95,8 @@ struct test_data
            CEREAL_NVP(strings),
            CEREAL_NVP(flex_ints),
            CEREAL_NVP(map),
-           CEREAL_NVP(metas));
+           CEREAL_NVP(metas),
+           CEREAL_NVP(single_meta));
     }
 };
 
@@ -242,6 +249,10 @@ TEST_CASE("Save with a special archive")
                 .ints = ints1,
             },
         }},
+        .single_meta =
+            meta{
+                .ints = {66, 50, 55},
+            },
     };
 
     const auto [json_str, archives] =
@@ -282,7 +293,7 @@ TEST_CASE("Save with a special archive")
         }();
         REQUIRE(archives_loaded
                     .storage[hana::type_c<immer_archive::vector_one<int>>]
-                    .archive.leaves.size() == 5);
+                    .archive.leaves.size() == 7);
     }
 
     // REQUIRE(json_str == "");

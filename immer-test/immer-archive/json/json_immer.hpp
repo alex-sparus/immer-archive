@@ -78,6 +78,7 @@ public:
     void finishNode() { archive.finishNode(); }
     void setNextName(const char* name) { archive.setNextName(name); }
     void loadSize(cereal::size_type& size) { archive.loadSize(size); }
+    bool hasName(const char* name) { return archive.hasName(name); }
 
     template <class T>
     void loadValue(T& value)
@@ -488,3 +489,23 @@ CEREAL_LOAD_FUNCTION_NAME(json_immer_input_archive<ImmerArchives>& ar,
 }
 
 } // namespace immer_archive
+
+// tie input and output archives together
+namespace cereal {
+namespace traits {
+namespace detail {
+template <class ImmerArchives>
+struct get_output_from_input<
+    immer_archive::json_immer_input_archive<ImmerArchives>>
+{
+    using type = immer_archive::json_immer_output_archive<ImmerArchives>;
+};
+template <class ImmerArchives>
+struct get_input_from_output<
+    immer_archive::json_immer_output_archive<ImmerArchives>>
+{
+    using type = immer_archive::json_immer_input_archive<ImmerArchives>;
+};
+} // namespace detail
+} // namespace traits
+} // namespace cereal

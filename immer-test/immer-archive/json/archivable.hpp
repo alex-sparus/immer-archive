@@ -1,6 +1,9 @@
 #pragma once
 
 #include <immer-archive/json/json_immer.hpp>
+#include <immer-archive/traits.hpp>
+
+#include <fmt/format.h>
 
 namespace immer_archive {
 
