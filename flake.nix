@@ -12,6 +12,12 @@
       url = "github:arximboldi/cereal";
       flake = false;
     };
+    immer = {
+      url = "github:alex-sparus/immer/immer-archive";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
   };
 
   outputs = {
@@ -20,6 +26,7 @@
     flake-utils,
     flake-compat,
     arximboldi-cereal-src,
+    immer,
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
@@ -59,6 +66,7 @@
           fmt_9
           catch2_3
           boost
+          immer.defaultPackage.${system}
 
           # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
           our_llvm.bintools-unwrapped
@@ -67,6 +75,10 @@
 
       arximboldi-cereal = pkgs.callPackage cereal-derivation {};
 
-      defaultPackage = pkgs.callPackage ./derivation.nix {stdenv = our_llvm.stdenv;};
+      defaultPackage = pkgs.callPackage ./derivation.nix {
+        stdenv = our_llvm.stdenv;
+        immer = immer.defaultPackage.${system};
+        inherit arximboldi-cereal;
+      };
     });
 }

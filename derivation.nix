@@ -3,25 +3,27 @@
   ninja,
   cmake,
   spdlog,
-  cereal,
+  arximboldi-cereal,
   fmt_9,
   catch2_3,
   boost,
   nlohmann_json,
   re2,
+  immer,
 }:
 stdenv.mkDerivation rec {
   pname = "immer-archive";
   version = "0.0";
-  src = ./immer-test;
+  src = ./.;
   buildInputs = [
     spdlog
-    cereal
+    arximboldi-cereal
     fmt_9
     catch2_3
     boost
     nlohmann_json
     re2
+    immer
   ];
 
   # Problems with having those separate json files. Either fix that or rewrite the tests to not depend on the files.
