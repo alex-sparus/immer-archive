@@ -68,6 +68,22 @@ void save_to_file(const std::filesystem::path& filename, std::string_view data)
     os.write(data.data(), data.size());
 }
 
+auto load_vec(const auto& json, auto vec_id)
+{
+    const auto archive =
+        test::from_json<immer_archive::archive_load<int>>(json);
+    auto loader = immer_archive::loader<int>{archive};
+    return loader.load_vector(vec_id);
+}
+
+auto load_flex_vec(const auto& json, auto vec_id)
+{
+    const auto archive =
+        test::from_json<immer_archive::archive_load<int>>(json);
+    auto loader = immer_archive::loader<int>{archive};
+    return loader.load_flex_vector(vec_id);
+}
+
 } // namespace
 
 using namespace test;
@@ -436,4 +452,374 @@ TEST_CASE("Archive in-place mutated flex_vector")
     REQUIRE(loaded1.has_value());
     REQUIRE(loaded2.has_value());
     REQUIRE(*loaded2 == loaded1->push_back(90));
+}
+
+TEST_CASE("Test nodes reuse")
+{
+    const auto small_vec = gen(immer_archive::flex_vector_one<int>{}, 67);
+    const auto big_vec   = small_vec; // + small_vec;
+
+    auto ar           = immer_archive::archive_save<int>{};
+    auto id1          = immer_archive::node_id{};
+    std::tie(ar, id1) = save_to_archive(big_vec, ar);
+
+    {
+        // Loads correctly
+        auto loader        = immer_archive::loader<int>{fix_leaf_nodes(ar)};
+        const auto loaded1 = loader.load_flex_vector(id1);
+        REQUIRE(loaded1.has_value());
+        REQUIRE(*loaded1 == big_vec);
+    }
+
+    // REQUIRE(to_json(ar) == "");
+}
+
+TEST_CASE("Invalid root id")
+{
+    const auto json = std::string{R"({
+            "value0": {
+                "leaves": [
+                    { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1 ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4, "value": [ 4, 5 ] }
+                ],
+                "inners": [
+                    { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
+                ],
+                "relaxed_inners": [],
+                "vectors": [
+                    { "key": 0, "value": { "root": 1, "tail": 1, "size": 7, "shift": 1 } }
+                ],
+                "flex_vectors": []
+            }
+        })"};
+    REQUIRE(load_vec(json, 0).has_value() == false);
+}
+
+TEST_CASE("Invalid tail id")
+{
+    const auto json = std::string{R"({
+            "value0": {
+                "leaves": [
+                    { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1 ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4, "value": [ 4, 5 ] }
+                ],
+                "inners": [
+                    { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
+                ],
+                "relaxed_inners": [],
+                "vectors": [
+                    { "key": 0, "value": { "root": 0, "tail": 999, "size": 7, "shift": 1 } }
+                ],
+                "flex_vectors": []
+            }
+        })"};
+    REQUIRE(load_vec(json, 0).has_value() == false);
+}
+
+TEST_CASE("Node has itself as a child")
+{
+    const auto json = std::string{R"({
+            "value0": {
+                "leaves": [
+                    { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1
+                    ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4,
+                    "value": [ 4, 5 ] }
+                ],
+                "inners": [
+                    { "key": 0, "value": { "children": [ 2, 0, 4 ] } }
+                ],
+                "relaxed_inners": [],
+                "vectors": [
+                    { "key": 0, "value": { "root": 0, "tail": 1, "size": 7,
+                    "shift": 1 } }
+                ],
+                "flex_vectors": []
+            }
+        })"};
+    REQUIRE(load_vec(json, 0).has_value() == false);
+}
+
+TEST_CASE("A loop with 2 nodes")
+{
+    const auto json = std::string{R"({
+    "value0": {
+        "leaves": [
+            {
+                "key": 32,
+                "value": [
+                    58,
+                    59
+                ]
+            },
+            {
+                "key": 34,
+                "value": [
+                    62,
+                    63
+                ]
+            },
+            {
+                "key": 3,
+                "value": [
+                    0,
+                    1
+                ]
+            },
+            {
+                "key": 5,
+                "value": [
+                    4,
+                    5
+                ]
+            },
+            {
+                "key": 6,
+                "value": [
+                    6,
+                    7
+                ]
+            },
+            {
+                "key": 7,
+                "value": [
+                    8,
+                    9
+                ]
+            },
+            {
+                "key": 8,
+                "value": [
+                    10,
+                    11
+                ]
+            },
+            {
+                "key": 9,
+                "value": [
+                    12,
+                    13
+                ]
+            },
+            {
+                "key": 10,
+                "value": [
+                    14,
+                    15
+                ]
+            },
+            {
+                "key": 11,
+                "value": [
+                    16,
+                    17
+                ]
+            },
+            {
+                "key": 12,
+                "value": [
+                    18,
+                    19
+                ]
+            },
+            {
+                "key": 13,
+                "value": [
+                    20,
+                    21
+                ]
+            },
+            {
+                "key": 14,
+                "value": [
+                    22,
+                    23
+                ]
+            },
+            {
+                "key": 15,
+                "value": [
+                    24,
+                    25
+                ]
+            },
+            {
+                "key": 16,
+                "value": [
+                    26,
+                    27
+                ]
+            },
+            {
+                "key": 17,
+                "value": [
+                    28,
+                    29
+                ]
+            },
+            {
+                "key": 18,
+                "value": [
+                    30,
+                    31
+                ]
+            },
+            {
+                "key": 19,
+                "value": [
+                    32,
+                    33
+                ]
+            },
+            {
+                "key": 20,
+                "value": [
+                    34,
+                    35
+                ]
+            },
+            {
+                "key": 21,
+                "value": [
+                    36,
+                    37
+                ]
+            },
+            {
+                "key": 22,
+                "value": [
+                    38,
+                    39
+                ]
+            },
+            {
+                "key": 23,
+                "value": [
+                    40,
+                    41
+                ]
+            },
+            {
+                "key": 24,
+                "value": [
+                    42,
+                    43
+                ]
+            },
+            {
+                "key": 25,
+                "value": [
+                    44,
+                    45
+                ]
+            },
+            {
+                "key": 26,
+                "value": [
+                    46,
+                    47
+                ]
+            },
+            {
+                "key": 27,
+                "value": [
+                    48,
+                    49
+                ]
+            },
+            {
+                "key": 28,
+                "value": [
+                    50,
+                    51
+                ]
+            },
+            {
+                "key": 29,
+                "value": [
+                    52,
+                    53
+                ]
+            },
+            {
+                "key": 30,
+                "value": [
+                    54,
+                    55
+                ]
+            },
+            {
+                "key": 31,
+                "value": [
+                    56,
+                    57
+                ]
+            },
+            {
+                "key": 1,
+                "value": [
+                    66
+                ]
+            },
+            {
+                "key": 33,
+                "value": [
+                    60,
+                    61
+                ]
+            },
+            {
+                "key": 4,
+                "value": [
+                    2,
+                    3
+                ]
+            },
+            {
+                "key": 36,
+                "value": [
+                    64,
+                    65
+                ]
+            }
+        ],
+        "inners": [
+            {
+                "key": 0,
+                "value": {
+                    "children": [
+                        2,
+                        35
+                    ]
+                }
+            },
+            {
+                "key": 35,
+                "value": {
+                    "children": [
+                        36, 0
+                    ]
+                }
+            },
+            {
+                "key": 2,
+                "value": {
+                    "children": [ 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 ]
+                }
+            }
+        ],
+        "relaxed_inners": [],
+        "vectors": [],
+        "flex_vectors": [
+            {
+                "key": 0,
+                "value": {
+                    "root": 0,
+                    "tail": 1,
+                    "size": 67,
+                    "shift": 6
+                }
+            }
+        ]
+    }
+}
+)"};
+    REQUIRE(load_flex_vec(json, 0).has_value() == false);
 }

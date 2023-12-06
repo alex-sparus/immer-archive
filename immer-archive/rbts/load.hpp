@@ -3,6 +3,7 @@
 #include <immer-archive/node_ptr.hpp>
 #include <immer-archive/rbts/archive.hpp>
 
+#include <immer/set.hpp>
 #include <immer/vector.hpp>
 #include <optional>
 
@@ -21,6 +22,7 @@ public:
     using node_t         = typename rbtree::node_t;
     using node_ptr       = node_ptr<node_t>;
     using inner_node_ptr = inner_node_ptr<node_t>;
+    using nodes_set_t    = immer::set<node_id>;
 
     explicit loader(archive_load<T> ar)
         : ar_{std::move(ar)}
@@ -34,13 +36,23 @@ public:
             return std::nullopt;
         }
 
-        // auto b = builder{info->size, info->shift};
-        // b.build();
+        auto root = node_ptr{nullptr};
+        try {
+            // Protection against cycles while loading nodes.
+            const auto loading_nodes = nodes_set_t{};
+            root = load_strict(info->rbts.root, loading_nodes);
+        } catch (const std::invalid_argument&) {
+            return std::nullopt;
+        }
+        if (!root) {
+            return std::nullopt;
+        }
 
-        auto root = load_strict(info->rbts.root);
         auto tail = load_leaf(info->rbts.tail);
-        assert(root);
-        assert(tail);
+        if (!tail) {
+            return std::nullopt;
+        }
+
         auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{
             info->rbts.size,
             info->rbts.shift,
@@ -57,10 +69,23 @@ public:
             return std::nullopt;
         }
 
-        auto root = load_some_node(info->rbts.root);
+        auto root = node_ptr{nullptr};
+        try {
+            // Protection against cycles while loading nodes.
+            const auto loading_nodes = nodes_set_t{};
+            root = load_some_node(info->rbts.root, loading_nodes);
+        } catch (const std::invalid_argument&) {
+            return std::nullopt;
+        }
+        if (!root) {
+            return std::nullopt;
+        }
+
         auto tail = load_leaf(info->rbts.tail);
-        assert(root);
-        assert(tail);
+        if (!tail) {
+            return std::nullopt;
+        }
+
         auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{
             info->rbts.size,
             info->rbts.shift,
@@ -90,8 +115,13 @@ private:
         return leaf;
     }
 
-    node_ptr load_strict(node_id id)
+    node_ptr load_strict(node_id id, nodes_set_t loading_nodes)
     {
+        if (loading_nodes.count(id)) {
+            // This is definitely a cycle
+            return nullptr;
+        }
+
         if (auto* p = inners_.find(id)) {
             return p->node;
         }
@@ -101,13 +131,15 @@ private:
             return nullptr;
         }
 
+        loading_nodes = std::move(loading_nodes).insert(id);
+
         const auto n  = node_info->children.size();
         auto inner    = node_ptr{node_t::make_inner_n(n),
                               [n](auto* ptr) { node_t::delete_inner(ptr, n); }};
         auto children = immer::vector<node_ptr>{};
         auto index    = std::size_t{};
         for (const auto& child_node_id : node_info->children) {
-            auto child = load_some_node(child_node_id);
+            auto child = load_some_node(child_node_id, loading_nodes);
             if (!child) {
                 throw std::invalid_argument{
                     fmt::format("Failed to load node ID {}", child_node_id)};
@@ -125,8 +157,13 @@ private:
         return inner;
     }
 
-    node_ptr load_relaxed(node_id id)
+    node_ptr load_relaxed(node_id id, nodes_set_t loading_nodes)
     {
+        if (loading_nodes.count(id)) {
+            // This is definitely a cycle
+            return nullptr;
+        }
+
         if (auto* p = inners_.find(id)) {
             return p->node;
         }
@@ -136,6 +173,8 @@ private:
             return nullptr;
         }
 
+        loading_nodes = std::move(loading_nodes).insert(id);
+
         const auto n = node_info->children.size();
         auto relaxed = node_ptr{node_t::make_inner_r_n(n), [n](auto* ptr) {
                                     node_t::delete_inner_r(ptr, n);
@@ -144,7 +183,7 @@ private:
         auto children                     = immer::vector<node_ptr>{};
         auto index                        = std::size_t{};
         for (const auto& [child_node_id, child_size] : node_info->children) {
-            auto child = load_some_node(child_node_id);
+            auto child = load_some_node(child_node_id, loading_nodes);
             if (!child) {
                 throw std::invalid_argument{
                     fmt::format("Failed to load node ID {}", child_node_id)};
@@ -163,17 +202,17 @@ private:
         return relaxed;
     }
 
-    node_ptr load_some_node(node_id id)
+    node_ptr load_some_node(node_id id, nodes_set_t loading_nodes)
     {
         // Unknown type: leaf, inner or relaxed
         if (ar_.leaves.count(id)) {
             return load_leaf(id);
         }
         if (ar_.inners.count(id)) {
-            return load_strict(id);
+            return load_strict(id, std::move(loading_nodes));
         }
         if (ar_.relaxed_inners.count(id)) {
-            return load_relaxed(id);
+            return load_relaxed(id, std::move(loading_nodes));
         }
         return nullptr;
     }
