@@ -9,7 +9,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace immer_archive {
+namespace immer_archive::rbts {
 
 template <class T,
           typename MemoryPolicy         = immer::default_memory_policy,
@@ -257,4 +257,4 @@ private:
     loader<T, MemoryPolicy, B> loader;
 };
 
-} // namespace immer_archive
+} // namespace immer_archive::rbts

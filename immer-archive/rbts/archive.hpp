@@ -25,6 +25,10 @@ template <typename T,
           immer::detail::rbts::bits_t B = immer::default_bits>
 using flex_vector_one = immer::flex_vector<T, MemoryPolicy, B, 1>;
 
+} // namespace immer_archive
+
+namespace immer_archive::rbts {
+
 using node_id = std::uint64_t;
 static_assert(sizeof(void*) == sizeof(node_id));
 
@@ -356,22 +360,22 @@ void load(Archive& ar, archive_load<T...>& value)
        CEREAL_NVP(flex_vectors));
 }
 
-} // namespace immer_archive
+} // namespace immer_archive::rbts
 
 namespace std {
 
 template <>
-struct hash<immer_archive::rbts_id>
+struct hash<immer_archive::rbts::rbts_id>
 {
-    auto operator()(const immer_archive::rbts_id& x) const
+    auto operator()(const immer_archive::rbts::rbts_id& x) const
     {
         const auto boost_combine = [](std::size_t& seed, std::size_t hash) {
             seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         };
 
         auto seed = std::size_t{};
-        boost_combine(seed, hash<immer_archive::node_id>{}(x.root));
-        boost_combine(seed, hash<immer_archive::node_id>{}(x.tail));
+        boost_combine(seed, hash<immer_archive::rbts::node_id>{}(x.root));
+        boost_combine(seed, hash<immer_archive::rbts::node_id>{}(x.tail));
         return seed;
     }
 };

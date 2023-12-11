@@ -1,93 +1,12 @@
 #pragma once
 
-#include <immer-archive/rbts/archive.hpp>
-
-#include <immer/detail/rbts/rrbtree.hpp>
+#include <immer-archive/rbts/traverse.hpp>
 
 #include <spdlog/spdlog.h>
 
-namespace immer_archive {
+namespace immer_archive::rbts {
 
-struct regular_pos_tag
-{};
-struct leaf_pos_tag
-{};
-struct relaxed_pos_tag
-{};
-
-template <class T>
-struct position_tag : std::false_type
-{};
-
-template <class... Rest>
-struct position_tag<immer::detail::rbts::regular_sub_pos<Rest...>>
-{
-    using type = regular_pos_tag;
-};
-
-template <class... Rest>
-struct position_tag<immer::detail::rbts::full_pos<Rest...>>
-{
-    using type = regular_pos_tag;
-};
-template <class... Rest>
-struct position_tag<immer::detail::rbts::regular_pos<Rest...>>
-{
-    using type = regular_pos_tag;
-};
-template <class... Rest>
-struct position_tag<immer::detail::rbts::empty_regular_pos<Rest...>>
-{
-    using type = regular_pos_tag;
-};
-
-template <class... Rest>
-struct position_tag<immer::detail::rbts::leaf_sub_pos<Rest...>>
-{
-    using type = leaf_pos_tag;
-};
-template <class... Rest>
-struct position_tag<immer::detail::rbts::full_leaf_pos<Rest...>>
-{
-    using type = leaf_pos_tag;
-};
-template <class... Rest>
-struct position_tag<immer::detail::rbts::leaf_pos<Rest...>>
-{
-    using type = leaf_pos_tag;
-};
-template <class... Rest>
-struct position_tag<immer::detail::rbts::empty_leaf_pos<Rest...>>
-{
-    using type = leaf_pos_tag;
-};
-
-template <class... Rest>
-struct position_tag<immer::detail::rbts::relaxed_pos<Rest...>>
-{
-    using type = relaxed_pos_tag;
-};
-
-struct visitor_helper
-{
-    template <class T, class F>
-    static void visit_regular(T&& pos, F&& fn)
-    {
-        fn(std::forward<T>(pos));
-    }
-
-    template <class T, class F>
-    static void visit_relaxed(T&& pos, F&& fn)
-    {
-        fn(std::forward<T>(pos));
-    }
-
-    template <class T, class F>
-    static void visit_leaf(T&& pos, F&& fn)
-    {
-        fn(std::forward<T>(pos));
-    }
-};
+namespace detail {
 
 template <typename T, typename MemoryPolicy, immer::detail::rbts::bits_t B>
 std::pair<archive_save<T>, node_id>
@@ -193,8 +112,9 @@ struct archive_builder
     template <typename MemoryPolicy, immer::detail::rbts::bits_t B>
     node_id get_node_id(immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
     {
-        auto [ar2, id] = immer_archive::get_node_id(std::move(ar), ptr);
-        ar             = std::move(ar2);
+        auto [ar2, id] =
+            immer_archive::rbts::detail::get_node_id(std::move(ar), ptr);
+        ar = std::move(ar2);
         return id;
     }
 };
@@ -238,18 +158,22 @@ auto save_nodes(const immer::detail::rbts::rrbtree<T, MemoryPolicy, B, 1>& tree,
     return result;
 }
 
+} // namespace detail
+
 template <class T>
 std::pair<archive_save<T>, node_id> save_to_archive(vector_one<T> vec,
                                                     archive_save<T> archive)
 {
-    const auto& impl           = vec.impl();
-    auto root_id               = node_id{};
-    auto tail_id               = node_id{};
-    std::tie(archive, root_id) = get_node_id(std::move(archive), impl.root);
-    std::tie(archive, tail_id) = get_node_id(std::move(archive), impl.tail);
-    const auto tree_id         = rbts_id{
-                .root = root_id,
-                .tail = tail_id,
+    const auto& impl = vec.impl();
+    auto root_id     = node_id{};
+    auto tail_id     = node_id{};
+    std::tie(archive, root_id) =
+        detail::get_node_id(std::move(archive), impl.root);
+    std::tie(archive, tail_id) =
+        detail::get_node_id(std::move(archive), impl.tail);
+    const auto tree_id = rbts_id{
+        .root = root_id,
+        .tail = tail_id,
     };
 
     if (auto* p = archive.rbts_to_id.find(tree_id)) {
@@ -258,7 +182,7 @@ std::pair<archive_save<T>, node_id> save_to_archive(vector_one<T> vec,
         return {std::move(archive), vector_id};
     }
 
-    archive = save_nodes(impl, std::move(archive));
+    archive = detail::save_nodes(impl, std::move(archive));
 
     assert(archive.inners.count(root_id));
     assert(archive.leaves.count(tail_id));
@@ -287,14 +211,16 @@ template <class T>
 std::pair<archive_save<T>, node_id> save_to_archive(flex_vector_one<T> vec,
                                                     archive_save<T> archive)
 {
-    const auto& impl           = vec.impl();
-    auto root_id               = node_id{};
-    auto tail_id               = node_id{};
-    std::tie(archive, root_id) = get_node_id(std::move(archive), impl.root);
-    std::tie(archive, tail_id) = get_node_id(std::move(archive), impl.tail);
-    const auto tree_id         = rbts_id{
-                .root = root_id,
-                .tail = tail_id,
+    const auto& impl = vec.impl();
+    auto root_id     = node_id{};
+    auto tail_id     = node_id{};
+    std::tie(archive, root_id) =
+        detail::get_node_id(std::move(archive), impl.root);
+    std::tie(archive, tail_id) =
+        detail::get_node_id(std::move(archive), impl.tail);
+    const auto tree_id = rbts_id{
+        .root = root_id,
+        .tail = tail_id,
     };
 
     if (auto* p = archive.rbts_to_id.find(tree_id)) {
@@ -303,7 +229,7 @@ std::pair<archive_save<T>, node_id> save_to_archive(flex_vector_one<T> vec,
         return {std::move(archive), vector_id};
     }
 
-    archive = save_nodes(impl, std::move(archive));
+    archive = detail::save_nodes(impl, std::move(archive));
 
     assert(archive.inners.count(root_id) ||
            archive.relaxed_inners.count(root_id));
@@ -329,4 +255,4 @@ std::pair<archive_save<T>, node_id> save_to_archive(flex_vector_one<T> vec,
     return {std::move(archive), vector_id};
 }
 
-} // namespace immer_archive
+} // namespace immer_archive::rbts

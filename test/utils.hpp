@@ -15,12 +15,13 @@ namespace test {
 using example_vector      = immer_archive::vector_one<int>;
 using example_flex_vector = immer_archive::flex_vector_one<int>;
 
-const auto gen = [](auto init, int count) {
+inline auto gen(auto init, int count)
+{
     for (int i = 0; i < count; ++i) {
         init = std::move(init).push_back(i);
     }
     return init;
-};
+}
 
 template <typename T>
 std::string to_json(const T& serializable)
