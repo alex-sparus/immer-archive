@@ -30,20 +30,7 @@ struct archive_builder
     archive_save<T> ar;
 
     template <class Pos>
-    void operator()(Pos& pos)
-    {
-        visit(pos);
-    }
-
-    template <class Pos>
-    void visit(Pos& pos)
-    {
-        using Tag = typename position_tag<std::decay_t<Pos>>::type;
-        visit(Tag{}, pos);
-    }
-
-    template <class Pos>
-    void visit(regular_pos_tag, Pos& pos)
+    void operator()(regular_pos_tag, Pos& pos, auto&& visit)
     {
         auto id = get_node_id(pos.node());
         if (ar.inners.count(id)) {
@@ -52,17 +39,19 @@ struct archive_builder
 
         auto node_info = inner_node{};
         // Explicit this-> call to workaround an "unused this" warning.
-        pos.each(visitor_helper{}, [&node_info, this](auto& child_pos) mutable {
-            node_info.children =
-                std::move(node_info.children)
-                    .push_back(this->get_node_id(child_pos.node()));
-            visit(child_pos);
-        });
+        pos.each(visitor_helper{},
+                 [&node_info, &visit, this](
+                     auto any_tag, auto& child_pos, auto&&) mutable {
+                     node_info.children =
+                         std::move(node_info.children)
+                             .push_back(this->get_node_id(child_pos.node()));
+                     visit(child_pos);
+                 });
         ar.inners = std::move(ar.inners).set(id, node_info);
     }
 
     template <class Pos>
-    void visit(relaxed_pos_tag, Pos& pos)
+    void operator()(relaxed_pos_tag, Pos& pos, auto&& visit)
     {
         auto id = get_node_id(pos.node());
         if (ar.relaxed_inners.count(id)) {
@@ -74,16 +63,18 @@ struct archive_builder
         auto* node = pos.node();
         auto* r    = node->relaxed();
         auto index = std::size_t{};
-        pos.each(visitor_helper{}, [&](auto& child_pos) mutable {
-            node_info.children = std::move(node_info.children)
-                                     .push_back(relaxed_child{
-                                         .node = get_node_id(child_pos.node()),
-                                         .size = r->d.sizes[index],
-                                     });
-            ++index;
+        pos.each(visitor_helper{},
+                 [&](auto any_tag, auto& child_pos, auto&&) mutable {
+                     node_info.children =
+                         std::move(node_info.children)
+                             .push_back(relaxed_child{
+                                 .node = get_node_id(child_pos.node()),
+                                 .size = r->d.sizes[index],
+                             });
+                     ++index;
 
-            visit(child_pos);
-        });
+                     visit(child_pos);
+                 });
 
         assert(node_info.children.size() == r->d.count);
 
@@ -91,7 +82,7 @@ struct archive_builder
     }
 
     template <class Pos>
-    void visit(leaf_pos_tag, Pos& pos)
+    void operator()(leaf_pos_tag, Pos& pos, auto&& visit)
     {
         T* first = pos.node()->leaf();
         auto id  = get_node_id(pos.node());

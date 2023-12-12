@@ -2,7 +2,9 @@
 
 #include <immer-archive/node_ptr.hpp>
 #include <immer-archive/rbts/archive.hpp>
+#include <immer-archive/rbts/traverse.hpp>
 
+#include <boost/hana/functional/overload.hpp>
 #include <immer/set.hpp>
 #include <immer/vector.hpp>
 #include <optional>
@@ -19,6 +21,7 @@ class loader
 public:
     static constexpr auto BL = immer::detail::rbts::bits_t{1};
     using rbtree         = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
+    using rrbtree        = immer::detail::rbts::rrbtree<T, MemoryPolicy, B, BL>;
     using node_t         = typename rbtree::node_t;
     using node_ptr       = node_ptr<node_t>;
     using inner_node_ptr = inner_node_ptr<node_t>;
@@ -53,11 +56,17 @@ public:
             return std::nullopt;
         }
 
-        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{
-            info->rbts.size,
-            info->rbts.shift,
-            std::move(root).release(),
-            std::move(tail).release()};
+        auto impl = rbtree{info->rbts.size,
+                           info->rbts.shift,
+                           std::move(root).release(),
+                           std::move(tail).release()};
+
+        try {
+            verify_tree(impl);
+        } catch (const std::invalid_argument& err) {
+            return std::nullopt;
+        }
+
         return vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
@@ -86,11 +95,15 @@ public:
             return std::nullopt;
         }
 
-        auto impl = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>{
-            info->rbts.size,
-            info->rbts.shift,
-            std::move(root).release(),
-            std::move(tail).release()};
+        auto impl = rrbtree{info->rbts.size,
+                            info->rbts.shift,
+                            std::move(root).release(),
+                            std::move(tail).release()};
+        try {
+            verify_tree(impl);
+        } catch (const std::invalid_argument& err) {
+            return std::nullopt;
+        }
         return flex_vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
@@ -106,12 +119,18 @@ private:
             return nullptr;
         }
 
-        const auto n = node_info->data.size();
-        auto leaf    = node_ptr{node_t::make_leaf_n(n),
+        const auto n         = node_info->data.size();
+        constexpr auto max_n = immer::detail::rbts::branches<BL>;
+        if (n > max_n) {
+            return nullptr;
+        }
+
+        auto leaf = node_ptr{node_t::make_leaf_n(n),
                              [n](auto* ptr) { node_t::delete_leaf(ptr, n); }};
         immer::detail::uninitialized_copy(
             node_info->data.begin(), node_info->data.end(), leaf.get()->leaf());
-        leaves_ = std::move(leaves_).set(id, leaf);
+        leaves_        = std::move(leaves_).set(id, leaf);
+        loaded_leaves_ = std::move(loaded_leaves_).set(leaf.get(), id);
         return leaf;
     }
 
@@ -133,7 +152,12 @@ private:
 
         loading_nodes = std::move(loading_nodes).insert(id);
 
-        const auto n  = node_info->children.size();
+        const auto n         = node_info->children.size();
+        constexpr auto max_n = immer::detail::rbts::branches<B>;
+        if (n > max_n) {
+            return nullptr;
+        }
+
         auto inner    = node_ptr{node_t::make_inner_n(n),
                               [n](auto* ptr) { node_t::delete_inner(ptr, n); }};
         auto children = immer::vector<node_ptr>{};
@@ -149,11 +173,12 @@ private:
             inner.get()->inner()[index] = raw_ptr;
             ++index;
         }
-        inners_ = std::move(inners_).set(id,
+        inners_        = std::move(inners_).set(id,
                                          inner_node_ptr{
-                                             .node     = inner,
-                                             .children = std::move(children),
+                                                    .node     = inner,
+                                                    .children = std::move(children),
                                          });
+        loaded_inners_ = std::move(loaded_inners_).set(inner.get(), id);
         return inner;
     }
 
@@ -175,7 +200,12 @@ private:
 
         loading_nodes = std::move(loading_nodes).insert(id);
 
-        const auto n = node_info->children.size();
+        const auto n         = node_info->children.size();
+        constexpr auto max_n = immer::detail::rbts::branches<B>;
+        if (n > max_n) {
+            return nullptr;
+        }
+
         auto relaxed = node_ptr{node_t::make_inner_r_n(n), [n](auto* ptr) {
                                     node_t::delete_inner_r(ptr, n);
                                 }};
@@ -199,6 +229,8 @@ private:
                                              .node     = relaxed,
                                              .children = std::move(children),
                                          });
+        loaded_relaxed_inners_ =
+            std::move(loaded_relaxed_inners_).set(relaxed.get(), id);
         return relaxed;
     }
 
@@ -217,10 +249,111 @@ private:
         return nullptr;
     }
 
+    template <class Tree>
+    void verify_tree(const Tree& impl) const
+    {
+        impl.traverse(
+            detail::visitor_helper{},
+            boost::hana::overload(
+                [&](detail::regular_pos_tag, auto&& pos, auto&& visit) {
+                    // SPDLOG_INFO("regular_pos_tag");
+                    const auto* id = loaded_inners_.find(pos.node());
+                    assert(id);
+                    if (!id) {
+                        throw std::logic_error{"Inner node of a freshly loaded "
+                                               "vector is unknown"};
+                    }
+                    const auto* info = ar_.inners.find(*id);
+                    assert(info);
+                    if (!info) {
+                        throw std::logic_error{
+                            "No info for the just loaded inner node"};
+                    }
+
+                    const auto expected_count = pos.count();
+                    const auto real_count     = info->children.size();
+                    if (expected_count != real_count) {
+                        throw std::invalid_argument{
+                            fmt::format("Loaded vector is corrupted. Inner "
+                                        "node ID {} should "
+                                        "have {} children but it has {}",
+                                        *id,
+                                        expected_count,
+                                        real_count)};
+                    }
+
+                    pos.each(detail::visitor_helper{},
+                             [&visit](auto any_tag, auto& child_pos, auto&&) {
+                                 visit(child_pos);
+                             });
+                },
+                [&](detail::relaxed_pos_tag, auto&& pos, auto&& visit) {
+                    // SPDLOG_INFO("relaxed_pos_tag");
+                    const auto* id = loaded_relaxed_inners_.find(pos.node());
+                    assert(id);
+                    if (!id) {
+                        throw std::logic_error{"Relaxed node of a freshly "
+                                               "loaded vector is unknown"};
+                    }
+                    const auto* info = ar_.relaxed_inners.find(*id);
+                    assert(info);
+                    if (!info) {
+                        throw std::logic_error{
+                            "No info for the just loaded relaxed node"};
+                    }
+
+                    const auto expected_count = pos.count();
+                    const auto real_count     = info->children.size();
+                    if (expected_count != real_count) {
+                        throw std::invalid_argument{
+                            fmt::format("Loaded vector is corrupted. Inner "
+                                        "node ID {} should "
+                                        "have {} children but it has {}",
+                                        *id,
+                                        expected_count,
+                                        real_count)};
+                    }
+
+                    pos.each(detail::visitor_helper{},
+                             [&visit](auto any_tag, auto& child_pos, auto&&) {
+                                 visit(child_pos);
+                             });
+                },
+                [&](detail::leaf_pos_tag, auto&& pos, auto&& visit) {
+                    // SPDLOG_INFO("leaf_pos_tag");
+                    const auto* id = loaded_leaves_.find(pos.node());
+                    assert(id);
+                    if (!id) {
+                        throw std::logic_error{
+                            "Leaf of a freshly loaded vector is unknown"};
+                    }
+                    const auto* info = ar_.leaves.find(*id);
+                    assert(info);
+                    if (!info) {
+                        throw std::logic_error{
+                            "No info for the just loaded leaf"};
+                    }
+
+                    const auto expected_count = pos.count();
+                    const auto real_count     = info->data.size();
+                    if (expected_count != real_count) {
+                        throw std::invalid_argument{fmt::format(
+                            "Loaded vector is corrupted. Leaf ID {} should "
+                            "have {} elements but it has {}",
+                            *id,
+                            expected_count,
+                            real_count)};
+                    }
+                }));
+    }
+
 private:
     const archive_load<T> ar_;
     immer::map<node_id, node_ptr> leaves_;
     immer::map<node_id, inner_node_ptr> inners_;
+    immer::map<node_t*, node_id> loaded_leaves_;
+    immer::map<node_t*, node_id> loaded_inners_;
+    immer::map<node_t*, node_id> loaded_relaxed_inners_;
 };
 
 template <class T,

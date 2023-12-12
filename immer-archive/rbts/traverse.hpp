@@ -71,19 +71,28 @@ struct visitor_helper
     template <class T, class F>
     static void visit_regular(T&& pos, F&& fn)
     {
-        fn(std::forward<T>(pos));
+        visit_by_tag(std::forward<T>(pos), std::forward<F>(fn));
     }
 
     template <class T, class F>
     static void visit_relaxed(T&& pos, F&& fn)
     {
-        fn(std::forward<T>(pos));
+        visit_by_tag(std::forward<T>(pos), std::forward<F>(fn));
     }
 
     template <class T, class F>
     static void visit_leaf(T&& pos, F&& fn)
     {
-        fn(std::forward<T>(pos));
+        visit_by_tag(std::forward<T>(pos), std::forward<F>(fn));
+    }
+
+    template <class T, class F>
+    static void visit_by_tag(T&& pos, F&& fn)
+    {
+        using Tag = typename position_tag<std::decay_t<T>>::type;
+        fn(Tag{}, std::forward<T>(pos), [&fn](auto&& other_pos) {
+            visit_by_tag(other_pos, fn);
+        });
     }
 };
 

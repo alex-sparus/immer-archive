@@ -93,11 +93,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1701771845,
-        "narHash": "sha256-aVRRClcw0uIs+kRminDJI9cH/BpUwKs7c4rcXvXPVNE=",
+        "lastModified": 1702371637,
+        "narHash": "sha256-wxAOVO7jYW1tRcqTGtGP3KI+mO7E8/o3mZNKWBRQDk0=",
         "owner": "alex-sparus",
         "repo": "immer",
-        "rev": "bf8b9ba59a2f2b29ca0b27bfcb0e043666655855",
+        "rev": "28f31d12cb81e3a3e27266ac65ea3cbb79e656af",
         "type": "github"
       },
       "original": {
