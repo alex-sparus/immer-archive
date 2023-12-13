@@ -875,15 +875,7 @@ TEST_CASE("Test simple valid flex vector")
             {
                 "key": 0,
                 "value": {
-                "children": [
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 5},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4}
-                ]
+                "children": [ 2, 3, 4, 5, 2, 3, 4 ]
                 }
             }
             ],
@@ -948,15 +940,7 @@ TEST_CASE("A leaf with too few elements, flex")
             {
                 "key": 0,
                 "value": {
-                "children": [
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 1},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4}
-                ]
+                "children": [ 2, 3, 4, 1, 2, 3, 4 ]
                 }
             }
             ],
@@ -989,15 +973,7 @@ TEST_CASE("A leaf with no elements, flex")
             {
                 "key": 0,
                 "value": {
-                "children": [
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 1},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4}
-                ]
+                "children": [ 2, 3, 4, 1, 2, 3, 4 ]
                 }
             }
             ],
@@ -1109,48 +1085,27 @@ TEST_CASE("A relaxed node with too many elements")
                 "key": 0,
                 "value": {
                 "children": [
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 5},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 5},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 5},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 5},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 5},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 5},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4}
+                    2, 3,
+                    4, 5,
+                    2, 3,
+                    4, 2,
+                    3, 4,
+                    5, 2,
+                    3, 4,
+                    2, 3,
+                    4, 5,
+                    2, 3,
+                    4, 2,
+                    3, 4,
+                    5, 2,
+                    3, 4,
+                    2, 3,
+                    4, 5,
+                    2, 3,
+                    4, 2,
+                    3, 4,
+                    5, 2,
+                    3, 4
                 ]
                 }
             }
@@ -1205,14 +1160,7 @@ TEST_CASE("Flex, removed one of children")
             {
                 "key": 0,
                 "value": {
-                "children": [
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4},
-                    {"node": 2},
-                    {"node": 3},
-                    {"node": 4}
-                ]
+                    "children": [ 2, 3, 4, 2, 3, 4 ]
                 }
             }
             ],

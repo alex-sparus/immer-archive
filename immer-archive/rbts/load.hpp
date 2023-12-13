@@ -220,12 +220,12 @@ private:
         auto index                        = std::size_t{};
         auto running_size                 = std::size_t{};
         for (const auto& child_node_id : node_info->children) {
-            auto child = load_some_node(child_node_id.node, loading_nodes);
+            auto child = load_some_node(child_node_id, loading_nodes);
             if (!child) {
-                throw std::invalid_argument{fmt::format(
-                    "Failed to load node ID {}", child_node_id.node)};
+                throw std::invalid_argument{
+                    fmt::format("Failed to load node ID {}", child_node_id)};
             }
-            running_size += get_node_size(child_node_id.node);
+            running_size += get_node_size(child_node_id);
 
             auto* raw_ptr = child.get();
             children      = std::move(children).push_back(std::move(child));
@@ -277,7 +277,7 @@ private:
             if (auto* p = ar_.relaxed_inners.find(id)) {
                 auto result = std::size_t{};
                 for (const auto& child_id : p->children) {
-                    result += get_node_size(child_id.node);
+                    result += get_node_size(child_id);
                 }
                 return result;
             }

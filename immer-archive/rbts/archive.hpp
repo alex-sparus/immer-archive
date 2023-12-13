@@ -61,22 +61,9 @@ struct inner_node
     }
 };
 
-struct relaxed_child
-{
-    node_id node;
-
-    auto tie() const { return std::tie(node); }
-
-    friend bool operator==(const relaxed_child& left,
-                           const relaxed_child& right)
-    {
-        return left.tie() == right.tie();
-    }
-};
-
 struct relaxed_inner_node
 {
-    immer::vector<relaxed_child> children;
+    immer::vector<node_id> children;
 
     friend bool operator==(const relaxed_inner_node& left,
                            const relaxed_inner_node& right)
@@ -259,13 +246,6 @@ void serialize(Archive& ar, inner_node& value)
 {
     auto& children = value.children;
     ar(CEREAL_NVP(children));
-}
-
-template <class Archive>
-void serialize(Archive& ar, relaxed_child& value)
-{
-    auto& node = value.node;
-    ar(CEREAL_NVP(node));
 }
 
 template <class Archive>

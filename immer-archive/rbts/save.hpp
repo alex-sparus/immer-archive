@@ -67,9 +67,7 @@ struct archive_builder
                  [&](auto any_tag, auto& child_pos, auto&&) mutable {
                      node_info.children =
                          std::move(node_info.children)
-                             .push_back(relaxed_child{
-                                 .node = get_node_id(child_pos.node()),
-                             });
+                             .push_back(get_node_id(child_pos.node()));
                      ++index;
 
                      visit(child_pos);
