@@ -1122,6 +1122,7 @@ TEST_CASE("A leaf with too few elements")
 TEST_CASE("A leaf with too few elements, flex")
 {
     // Leaf #3 should have two elements, but it has only one.
+    // It works fine with the relaxed node.
     const auto json = std::string{R"({
         "value0": {
             "leaves": [
@@ -1136,38 +1137,40 @@ TEST_CASE("A leaf with too few elements, flex")
                 "key": 0,
                 "value": {
                 "children": [
-                    {"node": 2, "size": 2},
-                    {"node": 3, "size": 4},
-                    {"node": 4, "size": 6},
-                    {"node": 1, "size": 7},
-                    {"node": 2, "size": 9},
-                    {"node": 3, "size": 11},
-                    {"node": 4, "size": 13}
+                    {"node": 2},
+                    {"node": 3},
+                    {"node": 4},
+                    {"node": 1},
+                    {"node": 2},
+                    {"node": 3},
+                    {"node": 4}
                 ]
                 }
             }
             ],
             "vectors": [],
             "flex_vectors": [
-            {"key": 0, "value": {"root": 0, "tail": 1, "size": 14, "shift": 1}}
+            {"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}
             ]
         }
         })"};
 
-    REQUIRE(load_flex_vec(json, 0).has_value() == false);
+    const auto vec =
+        immer_archive::flex_vector_one<int>{0, 1, 2, 4, 5, 6, 0, 1, 2, 4, 5, 6};
+    REQUIRE(load_flex_vec(json, 0).value() == vec);
 }
 
-TEST_CASE("A leaf with too few elements, relaxed node, flex")
+TEST_CASE("A leaf with no elements, flex")
 {
-    // Leaf #5 should have one elements, but it has zero.
+    // Leaf #3 is empty.
+    // It works fine with the relaxed node.
     const auto json = std::string{R"({
         "value0": {
             "leaves": [
-            {"key": 1, "value": [6, 99]},
+            {"key": 1, "value": [6]},
             {"key": 2, "value": [0, 1]},
-            {"key": 3, "value": [2, 3]},
-            {"key": 4, "value": [4, 5]},
-            {"key": 5, "value": []}
+            {"key": 3, "value": []},
+            {"key": 4, "value": [4, 5]}
             ],
             "inners": [],
             "relaxed_inners": [
@@ -1175,24 +1178,27 @@ TEST_CASE("A leaf with too few elements, relaxed node, flex")
                 "key": 0,
                 "value": {
                 "children": [
-                    {"node": 2, "size": 2},
-                    {"node": 3, "size": 4},
-                    {"node": 4, "size": 6},
-                    {"node": 5, "size": 7},
-                    {"node": 2, "size": 9},
-                    {"node": 3, "size": 11},
-                    {"node": 4, "size": 13}
+                    {"node": 2},
+                    {"node": 3},
+                    {"node": 4},
+                    {"node": 1},
+                    {"node": 2},
+                    {"node": 3},
+                    {"node": 4}
                 ]
                 }
             }
             ],
             "vectors": [],
             "flex_vectors": [
-            {"key": 0, "value": {"root": 0, "tail": 1, "size": 15, "shift": 1}}
+            {"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}
             ]
         }
         })"};
-    REQUIRE(load_flex_vec(json, 0).has_value() == false);
+
+    const auto vec =
+        immer_archive::flex_vector_one<int>{0, 1, 4, 5, 6, 0, 1, 4, 5, 6};
+    REQUIRE(load_flex_vec(json, 0).value() == vec);
 }
 
 TEST_CASE("A tail with too few elements")
@@ -1220,43 +1226,6 @@ TEST_CASE("A tail with too few elements")
     REQUIRE(load_vec(json, 0).has_value() == false);
 }
 
-TEST_CASE("A tail with too few elements, flex")
-{
-    const auto json = std::string{R"({
-        "value0": {
-            "leaves": [
-            {"key": 1, "value": [6]},
-            {"key": 2, "value": [0, 1]},
-            {"key": 3, "value": [2, 3]},
-            {"key": 4, "value": [4, 5]},
-            {"key": 5, "value": [6]}
-            ],
-            "inners": [],
-            "relaxed_inners": [
-            {
-                "key": 0,
-                "value": {
-                "children": [
-                    {"node": 2, "size": 2},
-                    {"node": 3, "size": 4},
-                    {"node": 4, "size": 6},
-                    {"node": 5, "size": 7},
-                    {"node": 2, "size": 9},
-                    {"node": 3, "size": 11},
-                    {"node": 4, "size": 13}
-                ]
-                }
-            }
-            ],
-            "vectors": [],
-            "flex_vectors": [
-            {"key": 0, "value": {"root": 0, "tail": 1, "size": 15, "shift": 1}}
-            ]
-        }
-        })"};
-    REQUIRE(load_flex_vec(json, 0).has_value() == false);
-}
-
 TEST_CASE("A leaf with too many elements")
 {
     // Leaf #1 has three elements. Slightly different error: a node with so many
@@ -1273,7 +1242,7 @@ TEST_CASE("A leaf with too many elements")
                 ],
                 "relaxed_inners": [],
                 "vectors": [
-                    { "key": 0, "value": { "root": 0, "tail": 1, "size": 9,
+                    { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
                 ],
                 "flex_vectors": []
@@ -1385,6 +1354,7 @@ TEST_CASE("A relaxed node with too many elements")
 
 TEST_CASE("Too few children")
 {
+    // Node 0 had children 2, 3, 4. 3 is removed.
     const auto json = std::string{R"({
             "value0": {
                 "leaves": [
@@ -1397,68 +1367,57 @@ TEST_CASE("Too few children")
                 ],
                 "relaxed_inners": [],
                 "vectors": [
-                    { "key": 0, "value": { "root": 0, "tail": 1, "size": 7,
+                    { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
                 ],
                 "flex_vectors": []
             }
         })"};
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    const auto vec  = immer_archive::vector_one<int>{0, 1, 4, 5, 6};
+    REQUIRE(load_vec(json, 0).value() == vec);
 }
 
-// TEST_CASE("Too few relaxed children")
-// {
-//     // In this case, immer will try to create a make_leaf_sub_pos with count
-//     ==
-//     // 3, because there are 2 children nodes 4 (with size = 6) and node 2
-//     (size
-//     // = 9): 3 == 9 - 6.
-//     const auto json = std::string{R"({
-//         "value0": {
-//             "leaves": [
-//             {"key": 1, "value": [6, 99]},
-//             {"key": 2, "value": [0, 1]},
-//             {"key": 3, "value": [2, 3]},
-//             {"key": 4, "value": [4, 5]},
-//             {"key": 5, "value": [6]}
-//             ],
-//             "inners": [],
-//             "relaxed_inners": [
-//             {
-//                 "key": 0,
-//                 "value": {
-//                 "children": [
-//                     {"node": 2, "size": 2},
-//                     {"node": 3, "size": 4},
-//                     {"node": 4, "size": 6},
-//                     {"node": 2, "size": 9},
-//                     {"node": 3, "size": 11},
-//                     {"node": 4, "size": 13}
-//                 ]
-//                 }
-//             }
-//             ],
-//             "vectors": [],
-//             "flex_vectors": [
-//             {"key": 0, "value": {"root": 0, "tail": 1, "size": 15, "shift":
-//             1}}
-//             ]
-//         }
-//         })"};
+TEST_CASE("Flex, removed one of children")
+{
+    const auto json = std::string{R"({
+        "value0": {
+            "leaves": [
+            {"key": 1, "value": [6, 99]},
+            {"key": 2, "value": [0, 1]},
+            {"key": 3, "value": [2, 3]},
+            {"key": 4, "value": [4, 5]},
+            {"key": 5, "value": [6]}
+            ],
+            "inners": [],
+            "relaxed_inners": [
+            {
+                "key": 0,
+                "value": {
+                "children": [
+                    {"node": 2},
+                    {"node": 3},
+                    {"node": 4},
+                    {"node": 2},
+                    {"node": 3},
+                    {"node": 4}
+                ]
+                }
+            }
+            ],
+            "vectors": [],
+            "flex_vectors": [
+            {"key": 0, "value": {"root": 0, "tail": 1, "shift":
+            1}}
+            ]
+        }
+        })"};
 
-//     const auto small_vec =
-//         immer_archive::flex_vector_one<int>{0, 1, 2, 3, 4, 5, 6};
-//     const auto vec =
-//         small_vec + small_vec + immer_archive::flex_vector_one<int>{99};
-//     // {
-//     //     auto ar           = immer_archive::rbts::archive_save<int>{};
-//     //     auto id1          = immer_archive::rbts::node_id{};
-//     //     std::tie(ar, id1) = save_to_archive(vec, ar);
-
-//     //     REQUIRE(to_json(ar) == "");
-//     // }
-//     REQUIRE(load_flex_vec(json, 0).value() == vec);
-// }
+    const auto children_234 =
+        immer_archive::flex_vector_one<int>{0, 1, 2, 3, 4, 5};
+    const auto vec = children_234 + children_234 +
+                     immer_archive::flex_vector_one<int>{6, 99};
+    REQUIRE(load_flex_vec(json, 0).value() == vec);
+}
 
 TEST_CASE("Test unknown child")
 {

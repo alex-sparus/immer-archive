@@ -64,9 +64,8 @@ struct inner_node
 struct relaxed_child
 {
     node_id node;
-    std::size_t size;
 
-    auto tie() const { return std::tie(node, size); }
+    auto tie() const { return std::tie(node); }
 
     friend bool operator==(const relaxed_child& left,
                            const relaxed_child& right)
@@ -90,10 +89,9 @@ struct rbts_info
 {
     node_id root;
     node_id tail;
-    std::size_t size;
     immer::detail::rbts::shift_t shift;
 
-    auto tie() const { return std::tie(root, tail, size, shift); }
+    auto tie() const { return std::tie(root, tail, shift); }
 
     friend bool operator==(const rbts_info& left, const rbts_info& right)
     {
@@ -267,8 +265,7 @@ template <class Archive>
 void serialize(Archive& ar, relaxed_child& value)
 {
     auto& node = value.node;
-    auto& size = value.size;
-    ar(CEREAL_NVP(node), CEREAL_NVP(size));
+    ar(CEREAL_NVP(node));
 }
 
 template <class Archive>
@@ -283,9 +280,8 @@ void save(Archive& ar, const rbts_info& value)
 {
     auto& root  = value.root;
     auto& tail  = value.tail;
-    auto& size  = value.size;
     auto& shift = value.shift;
-    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(size), CEREAL_NVP(shift));
+    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(shift));
 }
 
 template <class Archive>
@@ -293,9 +289,8 @@ void load(Archive& ar, rbts_info& value)
 {
     auto& root  = value.root;
     auto& tail  = value.tail;
-    auto& size  = value.size;
     auto& shift = value.shift;
-    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(size), CEREAL_NVP(shift));
+    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(shift));
 }
 
 template <class Archive>

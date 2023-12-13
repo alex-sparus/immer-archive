@@ -69,7 +69,6 @@ struct archive_builder
                          std::move(node_info.children)
                              .push_back(relaxed_child{
                                  .node = get_node_id(child_pos.node()),
-                                 .size = r->d.sizes[index],
                              });
                      ++index;
 
@@ -189,7 +188,6 @@ std::pair<archive_save<T>, node_id> save_to_archive(vector_one<T> vec,
                                        rbts_info{
                                            .root  = root_id,
                                            .tail  = tail_id,
-                                           .size  = impl.size,
                                            .shift = impl.shift,
                                        },
                                    .vector = std::move(vec),
@@ -237,7 +235,6 @@ std::pair<archive_save<T>, node_id> save_to_archive(flex_vector_one<T> vec,
                                             rbts_info{
                                                 .root  = root_id,
                                                 .tail  = tail_id,
-                                                .size  = impl.size,
                                                 .shift = impl.shift,
                                             },
                                         .vector = std::move(vec),

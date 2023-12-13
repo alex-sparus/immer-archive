@@ -56,7 +56,10 @@ public:
             return std::nullopt;
         }
 
-        auto impl = rbtree{info->rbts.size,
+        const auto tree_size =
+            get_node_size(info->rbts.root) + get_node_size(info->rbts.tail);
+
+        auto impl = rbtree{tree_size,
                            info->rbts.shift,
                            std::move(root).release(),
                            std::move(tail).release()};
@@ -95,7 +98,10 @@ public:
             return std::nullopt;
         }
 
-        auto impl = rrbtree{info->rbts.size,
+        const auto tree_size =
+            get_node_size(info->rbts.root) + get_node_size(info->rbts.tail);
+
+        auto impl = rrbtree{tree_size,
                             info->rbts.shift,
                             std::move(root).release(),
                             std::move(tail).release()};
@@ -212,16 +218,19 @@ private:
         relaxed.get()->relaxed()->d.count = n;
         auto children                     = immer::vector<node_ptr>{};
         auto index                        = std::size_t{};
-        for (const auto& [child_node_id, child_size] : node_info->children) {
-            auto child = load_some_node(child_node_id, loading_nodes);
+        auto running_size                 = std::size_t{};
+        for (const auto& child_node_id : node_info->children) {
+            auto child = load_some_node(child_node_id.node, loading_nodes);
             if (!child) {
-                throw std::invalid_argument{
-                    fmt::format("Failed to load node ID {}", child_node_id)};
+                throw std::invalid_argument{fmt::format(
+                    "Failed to load node ID {}", child_node_id.node)};
             }
+            running_size += get_node_size(child_node_id.node);
+
             auto* raw_ptr = child.get();
             children      = std::move(children).push_back(std::move(child));
             relaxed.get()->inner()[index]            = raw_ptr;
-            relaxed.get()->relaxed()->d.sizes[index] = child_size;
+            relaxed.get()->relaxed()->d.sizes[index] = running_size;
             ++index;
         }
         inners_ = std::move(inners_).set(id,
@@ -247,6 +256,35 @@ private:
             return load_relaxed(id, std::move(loading_nodes));
         }
         return nullptr;
+    }
+
+    std::size_t get_node_size(node_id id)
+    {
+        if (auto* p = sizes_.find(id)) {
+            return *p;
+        }
+        auto size = [&] {
+            if (auto* p = ar_.leaves.find(id)) {
+                return p->data.size();
+            }
+            if (auto* p = ar_.inners.find(id)) {
+                auto result = std::size_t{};
+                for (const auto& child_id : p->children) {
+                    result += get_node_size(child_id);
+                }
+                return result;
+            }
+            if (auto* p = ar_.relaxed_inners.find(id)) {
+                auto result = std::size_t{};
+                for (const auto& child_id : p->children) {
+                    result += get_node_size(child_id.node);
+                }
+                return result;
+            }
+            throw std::invalid_argument{"Invalid node id"};
+        }();
+        sizes_ = std::move(sizes_).set(id, size);
+        return size;
     }
 
     template <class Tree>
@@ -354,6 +392,7 @@ private:
     immer::map<node_t*, node_id> loaded_leaves_;
     immer::map<node_t*, node_id> loaded_inners_;
     immer::map<node_t*, node_id> loaded_relaxed_inners_;
+    immer::map<node_id, std::size_t> sizes_;
 };
 
 template <class T,
