@@ -1,9 +1,12 @@
 #pragma once
 
+#include <immer-archive/errors.hpp>
 #include <immer-archive/json/json_immer.hpp>
 #include <immer-archive/traits.hpp>
 
 #include <fmt/format.h>
+
+#include <boost/hana/type.hpp>
 
 namespace immer_archive {
 
@@ -57,13 +60,29 @@ void load(json_immer_input_archive<ImmerArchives>& ar,
     auto id            = container_id{};
     ar(id);
 
-    auto& loader   = ar.get_archives().template get_loader<Container>();
-    auto container = loader.load(id);
-    if (!container) {
-        throw ::cereal::Exception{fmt::format(
-            "Failed to load a container ID {} from the archive", id)};
+    auto& loader = ar.get_archives().template get_loader<Container>();
+
+    constexpr auto is_optional = boost::hana::is_valid(
+        [](auto&& x) -> decltype((void) x.has_value()) {});
+    using IsOptional = decltype(is_optional(loader.load(id)));
+
+    if constexpr (IsOptional::value) {
+        auto container = loader.load(id);
+        if (!container) {
+            throw ::cereal::Exception{fmt::format(
+                "Failed to load a container ID {} from the archive", id)};
+        }
+        value.container = std::move(*container);
+    } else {
+        try {
+            value.container = loader.load(id);
+        } catch (const archive_exception& ex) {
+            throw ::cereal::Exception{fmt::format(
+                "Failed to load a container ID {} from the archive: {}",
+                id,
+                ex.what())};
+        }
     }
-    value.container = std::move(*container);
 }
 
 template <class Archive, class Container>

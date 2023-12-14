@@ -56,16 +56,7 @@ public:
     {
     }
 
-    std::optional<vector_one<T, MemoryPolicy, B>> load_vector(node_id id)
-    {
-        try {
-            return load_vector_ex(id);
-        } catch (const archive_exception&) {
-            return std::nullopt;
-        }
-    }
-
-    vector_one<T, MemoryPolicy, B> load_vector_ex(node_id id)
+    vector_one<T, MemoryPolicy, B> load_vector(node_id id)
     {
         auto* info = ar_.vectors.find(id);
         if (!info) {
@@ -87,17 +78,7 @@ public:
         return vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
-    std::optional<flex_vector_one<T, MemoryPolicy, B>>
-    load_flex_vector(node_id id)
-    {
-        try {
-            return load_flex_vector_ex(id);
-        } catch (const archive_exception&) {
-            return std::nullopt;
-        }
-    }
-
-    flex_vector_one<T, MemoryPolicy, B> load_flex_vector_ex(node_id id)
+    flex_vector_one<T, MemoryPolicy, B> load_flex_vector(node_id id)
     {
         auto* info = ar_.flex_vectors.find(id);
         if (!info) {

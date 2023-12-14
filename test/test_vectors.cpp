@@ -25,22 +25,6 @@ auto load_vec(const auto& json, auto vec_id)
     return loader.load_vector(vec_id);
 }
 
-auto load_vec_ex(const auto& json, auto vec_id)
-{
-    const auto archive =
-        test::from_json<immer_archive::rbts::archive_load<int>>(json);
-    auto loader = immer_archive::rbts::loader<int>{archive};
-    return loader.load_vector_ex(vec_id);
-}
-
-auto load_flex_vec_ex(const auto& json, auto vec_id)
-{
-    const auto archive =
-        test::from_json<immer_archive::rbts::archive_load<int>>(json);
-    auto loader = immer_archive::rbts::loader<int>{archive};
-    return loader.load_flex_vector_ex(vec_id);
-}
-
 auto load_flex_vec(const auto& json, auto vec_id)
 {
     const auto archive =
@@ -76,8 +60,7 @@ TEST_CASE("Save and load multiple times into the same archive")
             auto loader = std::make_optional(
                 immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)});
             auto loaded_vec = loader->load_vector(vector_id);
-            REQUIRE(loaded_vec.has_value());
-            REQUIRE(*loaded_vec == vec);
+            REQUIRE(loaded_vec == vec);
         }
         SPDLOG_DEBUG("end test size {}", vec.size());
     };
@@ -132,9 +115,8 @@ TEST_CASE("Save and load vectors with shared nodes")
     auto index = std::size_t{};
     for (const auto& id : ids) {
         auto v = loader.load_vector(id);
-        REQUIRE(v.has_value());
-        REQUIRE(v.value() == vectors[index]);
-        loaded.push_back(v.value());
+        REQUIRE(v == vectors[index]);
+        loaded.push_back(v);
         ++index;
     }
 
@@ -215,9 +197,8 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
         auto index  = std::size_t{};
         for (const auto& id : vector_ids) {
             auto v = loader.load_vector(id);
-            REQUIRE(v.has_value());
-            REQUIRE(v.value() == vectors[index]);
-            result.push_back(v.value());
+            REQUIRE(v == vectors[index]);
+            result.push_back(v);
             ++index;
         }
         return result;
@@ -229,9 +210,8 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
         auto index  = std::size_t{};
         for (const auto& id : flex_vectors_ids) {
             auto v = loader.load_flex_vector(id);
-            REQUIRE(v.has_value());
-            REQUIRE(v.value() == flex_vectors[index]);
-            result.push_back(v.value());
+            REQUIRE(v == flex_vectors[index]);
+            result.push_back(v);
             ++index;
         }
         return result;
@@ -258,9 +238,7 @@ TEST_CASE("Archive in-place mutated vector")
     auto loader        = immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
     const auto loaded1 = loader.load_vector(id1);
     const auto loaded2 = loader.load_vector(id2);
-    REQUIRE(loaded1.has_value());
-    REQUIRE(loaded2.has_value());
-    REQUIRE(*loaded2 == loaded1->push_back(90));
+    REQUIRE(loaded2 == loaded1.push_back(90));
 }
 
 TEST_CASE("Archive in-place mutated flex_vector")
@@ -279,9 +257,7 @@ TEST_CASE("Archive in-place mutated flex_vector")
     auto loader        = immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
     const auto loaded1 = loader.load_flex_vector(id1);
     const auto loaded2 = loader.load_flex_vector(id2);
-    REQUIRE(loaded1.has_value());
-    REQUIRE(loaded2.has_value());
-    REQUIRE(*loaded2 == loaded1->push_back(90));
+    REQUIRE(loaded2 == loaded1.push_back(90));
 }
 
 TEST_CASE("Test nodes reuse")
@@ -297,14 +273,13 @@ TEST_CASE("Test nodes reuse")
         // Loads correctly
         auto loader = immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
         const auto loaded1 = loader.load_flex_vector(id1);
-        REQUIRE(loaded1.has_value());
-        REQUIRE(*loaded1 == big_vec);
+        REQUIRE(loaded1 == big_vec);
     }
 
     // REQUIRE(to_json(ar) == "");
 }
 
-TEST_CASE("Test saving and loading vectors of different lengths")
+TEST_CASE("Test saving and loading vectors of different lengths", "[slow]")
 {
     constexpr auto for_each_generated_length =
         [](auto init, int count, auto&& process) {
@@ -328,8 +303,7 @@ TEST_CASE("Test saving and loading vectors of different lengths")
                     auto loader =
                         immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
                     const auto loaded1 = loader.load_vector(id1);
-                    REQUIRE(loaded1.has_value());
-                    REQUIRE(*loaded1 == vec);
+                    REQUIRE(loaded1 == vec);
                 }
             });
     }
@@ -347,14 +321,13 @@ TEST_CASE("Test saving and loading vectors of different lengths")
                     auto loader =
                         immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
                     const auto loaded1 = loader.load_vector(id1);
-                    REQUIRE(loaded1.has_value());
-                    REQUIRE(*loaded1 == vec);
+                    REQUIRE(loaded1 == vec);
                 }
             });
     }
 }
 
-TEST_CASE("Test saving and loading flex vectors of different lengths")
+TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
 {
     constexpr auto for_each_generated_length_flex =
         [](auto init, int count, auto&& process) {
@@ -384,8 +357,7 @@ TEST_CASE("Test saving and loading flex vectors of different lengths")
                     auto loader =
                         immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
                     const auto loaded1 = loader.load_flex_vector(id1);
-                    REQUIRE(loaded1.has_value());
-                    REQUIRE(*loaded1 == vec);
+                    REQUIRE(loaded1 == vec);
                 }
             });
     }
@@ -403,8 +375,7 @@ TEST_CASE("Test saving and loading flex vectors of different lengths")
                     auto loader =
                         immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
                     const auto loaded1 = loader.load_flex_vector(id1);
-                    REQUIRE(loaded1.has_value());
-                    REQUIRE(*loaded1 == vec);
+                    REQUIRE(loaded1 == vec);
                 }
             });
     }
@@ -427,7 +398,7 @@ TEST_CASE("Invalid root id")
                 "flex_vectors": []
             }
         })"};
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::invalid_node_id);
 }
 
 TEST_CASE("Invalid tail id")
@@ -447,7 +418,7 @@ TEST_CASE("Invalid tail id")
                 "flex_vectors": []
             }
         })"};
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::invalid_node_id);
 }
 
 TEST_CASE("Node has itself as a child")
@@ -470,7 +441,7 @@ TEST_CASE("Node has itself as a child")
                 "flex_vectors": []
             }
         })"};
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::archive_has_cycles);
 }
 
 TEST_CASE("A loop with 2 nodes")
@@ -756,7 +727,7 @@ TEST_CASE("A loop with 2 nodes")
     }
 }
 )"};
-    REQUIRE_THROWS_AS(load_flex_vec_ex(json, 0),
+    REQUIRE_THROWS_AS(load_flex_vec(json, 0),
                       immer_archive::archive_has_cycles);
 }
 
@@ -844,8 +815,7 @@ TEST_CASE("Test vector with very big objects")
         auto loader =
             immer_archive::rbts::loader<big_object>{fix_leaf_nodes(ar)};
         const auto loaded1 = loader.load_vector(id1);
-        REQUIRE(loaded1.has_value());
-        REQUIRE(*loaded1 == small_vec);
+        REQUIRE(loaded1 == small_vec);
     }
 
     // REQUIRE(to_json(ar) == "");
@@ -873,7 +843,7 @@ TEST_CASE("Test simple valid vector")
         })"};
 
     const auto vec = immer_archive::vector_one<int>{0, 1, 2, 3, 4, 5, 6};
-    REQUIRE(load_vec(json, 0).value() == vec);
+    REQUIRE(load_vec(json, 0) == vec);
 }
 
 TEST_CASE("Test simple valid flex vector")
@@ -913,7 +883,7 @@ TEST_CASE("Test simple valid flex vector")
 
     //     REQUIRE(to_json(ar) == "");
     // }
-    REQUIRE(load_flex_vec(json, 0).value() == vec);
+    REQUIRE(load_flex_vec(json, 0) == vec);
 }
 
 TEST_CASE("A leaf with too few elements")
@@ -937,7 +907,8 @@ TEST_CASE("A leaf with too few elements")
                 "flex_vectors": []
             }
         })"};
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_vec(json, 0),
+                      immer_archive::rbts::vector_corrupted_exception);
 }
 
 TEST_CASE("A leaf with too few elements, flex")
@@ -970,7 +941,7 @@ TEST_CASE("A leaf with too few elements, flex")
 
     const auto vec =
         immer_archive::flex_vector_one<int>{0, 1, 2, 4, 5, 6, 0, 1, 2, 4, 5, 6};
-    REQUIRE(load_flex_vec(json, 0).value() == vec);
+    REQUIRE(load_flex_vec(json, 0) == vec);
 }
 
 TEST_CASE("A leaf with no elements, flex")
@@ -1003,7 +974,7 @@ TEST_CASE("A leaf with no elements, flex")
 
     const auto vec =
         immer_archive::flex_vector_one<int>{0, 1, 4, 5, 6, 0, 1, 4, 5, 6};
-    REQUIRE(load_flex_vec(json, 0).value() == vec);
+    REQUIRE(load_flex_vec(json, 0) == vec);
 }
 
 TEST_CASE("A tail with too few elements")
@@ -1028,7 +999,8 @@ TEST_CASE("A tail with too few elements")
             }
         })"};
 
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_vec(json, 0),
+                      immer_archive::rbts::vector_corrupted_exception);
 }
 
 TEST_CASE("A leaf with too many elements")
@@ -1054,7 +1026,7 @@ TEST_CASE("A leaf with too many elements")
             }
         })"};
 
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::invalid_children_count);
 }
 
 TEST_CASE("An inner node with too many elements")
@@ -1082,7 +1054,7 @@ TEST_CASE("An inner node with too many elements")
                 "flex_vectors": []
             }
         })"};
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::invalid_children_count);
 }
 
 TEST_CASE("A relaxed node with too many elements")
@@ -1133,12 +1105,14 @@ TEST_CASE("A relaxed node with too many elements")
             ]
         }
         })"};
-    REQUIRE(load_flex_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_flex_vec(json, 0),
+                      immer_archive::invalid_children_count);
 }
 
 TEST_CASE("Too few children")
 {
     // Node 0 had children 2, 3, 4. 3 is removed.
+    // Still works though.
     const auto json = std::string{R"({
             "value0": {
                 "leaves": [
@@ -1158,7 +1132,7 @@ TEST_CASE("Too few children")
             }
         })"};
     const auto vec  = immer_archive::vector_one<int>{0, 1, 4, 5, 6};
-    REQUIRE(load_vec(json, 0).value() == vec);
+    REQUIRE(load_vec(json, 0) == vec);
 }
 
 TEST_CASE("Flex, removed one of children")
@@ -1193,7 +1167,7 @@ TEST_CASE("Flex, removed one of children")
         immer_archive::flex_vector_one<int>{0, 1, 2, 3, 4, 5};
     const auto vec = children_234 + children_234 +
                      immer_archive::flex_vector_one<int>{6, 99};
-    REQUIRE(load_flex_vec(json, 0).value() == vec);
+    REQUIRE(load_flex_vec(json, 0) == vec);
 }
 
 TEST_CASE("Test unknown child")
@@ -1216,7 +1190,7 @@ TEST_CASE("Test unknown child")
                 "flex_vectors": []
             }
         })"};
-    REQUIRE(load_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::invalid_node_id);
 }
 
 // TEST_CASE("Test corrupted shift")

@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_exception.hpp>
 
 #include <test/utils.hpp>
 
@@ -385,4 +386,165 @@ TEST_CASE("Special archive must load and save types that have no archive")
             std::decay_t<decltype(value)>>(json_archive_str);
         REQUIRE(loaded == value);
     }
+}
+
+TEST_CASE("Special archive loads empty test_data")
+{
+    const auto value = test_data{};
+
+    // const auto json_archive_str =
+    //     immer_archive::to_json_with_archive(value).first;
+    // REQUIRE(json_archive_str == "");
+
+    const auto json_archive_str = R"(
+        {
+            "value0": {
+                "ints": {"value0": 0},
+                "strings": {"value0": 0},
+                "flex_ints": {"value0": 0},
+                "map": {"value0": 0},
+                "metas": {"value0": 0},
+                "single_meta": {"ints": {"value0": 0}, "metas": {"value0": 0}}
+            },
+            "archives": {
+                "ints": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+                "flex_vectors": []
+                },
+                "strings": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+                "flex_vectors": []
+                },
+                "flex_ints": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [],
+                "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
+                },
+                "int_string_map": {
+                "nodes": {
+                    "inners": [
+                    {
+                        "key": 0,
+                        "value": {"values": [], "children": [], "nodemap": 0, "datamap": 0}
+                    }
+                    ],
+                    "collisions": []
+                },
+                "containers": [{"key": 0, "value": {"root": 0, "size": 0}}]
+                },
+                "metas": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+                "flex_vectors": []
+                },
+                "meta_metas": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+                "flex_vectors": []
+                },
+                "table_test_value": {
+                "nodes": {"inners": [], "collisions": []},
+                "containers": []
+                }
+            }
+            })";
+
+    {
+        auto loaded = immer_archive::from_json_with_archive<
+            std::decay_t<decltype(value)>>(json_archive_str);
+        REQUIRE(loaded == value);
+    }
+}
+
+TEST_CASE("Special archive throws cereal::Exception")
+{
+    const auto value = test_data{};
+
+    // const auto json_archive_str =
+    //     immer_archive::to_json_with_archive(value).first;
+    // REQUIRE(json_archive_str == "");
+
+    const auto json_archive_str = R"(
+        {
+            "value0": {
+                "ints": {"value0": 99},
+                "strings": {"value0": 0},
+                "flex_ints": {"value0": 0},
+                "map": {"value0": 0},
+                "metas": {"value0": 0},
+                "single_meta": {"ints": {"value0": 0}, "metas": {"value0": 0}}
+            },
+            "archives": {
+                "ints": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+                "flex_vectors": []
+                },
+                "strings": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+                "flex_vectors": []
+                },
+                "flex_ints": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [],
+                "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
+                },
+                "int_string_map": {
+                "nodes": {
+                    "inners": [
+                    {
+                        "key": 0,
+                        "value": {"values": [], "children": [], "nodemap": 0, "datamap": 0}
+                    }
+                    ],
+                    "collisions": []
+                },
+                "containers": [{"key": 0, "value": {"root": 0, "size": 0}}]
+                },
+                "metas": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+                "flex_vectors": []
+                },
+                "meta_metas": {
+                "leaves": [{"key": 1, "value": []}],
+                "inners": [{"key": 0, "value": {"children": []}}],
+                "relaxed_inners": [],
+                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+                "flex_vectors": []
+                },
+                "table_test_value": {
+                "nodes": {"inners": [], "collisions": []},
+                "containers": []
+                }
+            }
+            })";
+
+    REQUIRE_THROWS_MATCHES(
+        immer_archive::from_json_with_archive<std::decay_t<decltype(value)>>(
+            json_archive_str),
+        ::cereal::Exception,
+        Catch::Matchers::Message("Failed to load a container ID 99 from the "
+                                 "archive: Unknown vector ID 99"));
 }
