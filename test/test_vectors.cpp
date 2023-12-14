@@ -25,6 +25,22 @@ auto load_vec(const auto& json, auto vec_id)
     return loader.load_vector(vec_id);
 }
 
+auto load_vec_ex(const auto& json, auto vec_id)
+{
+    const auto archive =
+        test::from_json<immer_archive::rbts::archive_load<int>>(json);
+    auto loader = immer_archive::rbts::loader<int>{archive};
+    return loader.load_vector_ex(vec_id);
+}
+
+auto load_flex_vec_ex(const auto& json, auto vec_id)
+{
+    const auto archive =
+        test::from_json<immer_archive::rbts::archive_load<int>>(json);
+    auto loader = immer_archive::rbts::loader<int>{archive};
+    return loader.load_flex_vector_ex(vec_id);
+}
+
 auto load_flex_vec(const auto& json, auto vec_id)
 {
     const auto archive =
@@ -740,7 +756,8 @@ TEST_CASE("A loop with 2 nodes")
     }
 }
 )"};
-    REQUIRE(load_flex_vec(json, 0).has_value() == false);
+    REQUIRE_THROWS_AS(load_flex_vec_ex(json, 0),
+                      immer_archive::archive_has_cycles);
 }
 
 namespace {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <immer-archive/champ/archive.hpp>
+#include <immer-archive/errors.hpp>
 #include <immer-archive/node_ptr.hpp>
 
 #include <immer/flex_vector.hpp>
@@ -39,7 +40,7 @@ public:
 
         auto* node_info = archive_.collisions.find(id);
         if (!node_info) {
-            return {nullptr, {}};
+            throw invalid_node_id{id};
         }
 
         const auto n = node_info->data.size();
@@ -62,7 +63,7 @@ public:
 
         auto* node_info = archive_.inners.find(id);
         if (!node_info) {
-            return {nullptr, {}};
+            throw invalid_node_id{id};
         }
 
         const auto n  = node_info->children.size();
@@ -125,7 +126,7 @@ public:
         if (archive_.collisions.count(id)) {
             return load_collision(id);
         }
-        return {nullptr, {}};
+        throw invalid_node_id{id};
     }
 
 private:

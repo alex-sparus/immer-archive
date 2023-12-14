@@ -1,5 +1,6 @@
 #pragma once
 
+#include <immer-archive/errors.hpp>
 #include <immer-archive/node_ptr.hpp>
 #include <immer-archive/rbts/archive.hpp>
 #include <immer-archive/rbts/traverse.hpp>
@@ -12,6 +13,29 @@
 #include <spdlog/spdlog.h>
 
 namespace immer_archive::rbts {
+
+class vector_corrupted_exception : public archive_exception
+{
+public:
+    vector_corrupted_exception(node_id id_,
+                               std::size_t expected_count_,
+                               std::size_t real_count_)
+        : archive_exception{fmt::format("Loaded vector is corrupted. Inner "
+                                        "node ID {} should "
+                                        "have {} children but it has {}",
+                                        id_,
+                                        expected_count_,
+                                        real_count_)}
+        , id{id_}
+        , expected_count{expected_count_}
+        , real_count{real_count_}
+    {
+    }
+
+    node_id id;
+    std::size_t expected_count;
+    std::size_t real_count;
+};
 
 template <class T,
           typename MemoryPolicy         = immer::default_memory_policy,
@@ -34,27 +58,22 @@ public:
 
     std::optional<vector_one<T, MemoryPolicy, B>> load_vector(node_id id)
     {
+        try {
+            return load_vector_ex(id);
+        } catch (const archive_exception&) {
+            return std::nullopt;
+        }
+    }
+
+    vector_one<T, MemoryPolicy, B> load_vector_ex(node_id id)
+    {
         auto* info = ar_.vectors.find(id);
         if (!info) {
-            return std::nullopt;
+            throw archive_exception{fmt::format("Unknown vector ID {}", id)};
         }
 
-        auto root = node_ptr{nullptr};
-        try {
-            // Protection against cycles while loading nodes.
-            const auto loading_nodes = nodes_set_t{};
-            root = load_strict(info->rbts.root, loading_nodes);
-        } catch (const std::invalid_argument&) {
-            return std::nullopt;
-        }
-        if (!root) {
-            return std::nullopt;
-        }
-
+        auto root = load_strict(info->rbts.root, {});
         auto tail = load_leaf(info->rbts.tail);
-        if (!tail) {
-            return std::nullopt;
-        }
 
         const auto tree_size =
             get_node_size(info->rbts.root) + get_node_size(info->rbts.tail);
@@ -64,39 +83,29 @@ public:
                            std::move(root).release(),
                            std::move(tail).release()};
 
-        try {
-            verify_tree(impl);
-        } catch (const std::invalid_argument& err) {
-            return std::nullopt;
-        }
-
+        verify_tree(impl);
         return vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
     std::optional<flex_vector_one<T, MemoryPolicy, B>>
     load_flex_vector(node_id id)
     {
+        try {
+            return load_flex_vector_ex(id);
+        } catch (const archive_exception&) {
+            return std::nullopt;
+        }
+    }
+
+    flex_vector_one<T, MemoryPolicy, B> load_flex_vector_ex(node_id id)
+    {
         auto* info = ar_.flex_vectors.find(id);
         if (!info) {
-            return std::nullopt;
+            throw invalid_node_id{id};
         }
 
-        auto root = node_ptr{nullptr};
-        try {
-            // Protection against cycles while loading nodes.
-            const auto loading_nodes = nodes_set_t{};
-            root = load_some_node(info->rbts.root, loading_nodes);
-        } catch (const std::invalid_argument&) {
-            return std::nullopt;
-        }
-        if (!root) {
-            return std::nullopt;
-        }
-
+        auto root = load_some_node(info->rbts.root, {});
         auto tail = load_leaf(info->rbts.tail);
-        if (!tail) {
-            return std::nullopt;
-        }
 
         const auto tree_size =
             get_node_size(info->rbts.root) + get_node_size(info->rbts.tail);
@@ -105,11 +114,9 @@ public:
                             info->rbts.shift,
                             std::move(root).release(),
                             std::move(tail).release()};
-        try {
-            verify_tree(impl);
-        } catch (const std::invalid_argument& err) {
-            return std::nullopt;
-        }
+
+        verify_tree(impl);
+
         return flex_vector_one<T, MemoryPolicy, B>{std::move(impl)};
     }
 
@@ -122,13 +129,13 @@ private:
 
         auto* node_info = ar_.leaves.find(id);
         if (!node_info) {
-            return nullptr;
+            throw invalid_node_id{id};
         }
 
         const auto n         = node_info->data.size();
         constexpr auto max_n = immer::detail::rbts::branches<BL>;
         if (n > max_n) {
-            return nullptr;
+            throw invalid_children_count{id};
         }
 
         auto leaf = node_ptr{node_t::make_leaf_n(n),
@@ -143,8 +150,7 @@ private:
     node_ptr load_strict(node_id id, nodes_set_t loading_nodes)
     {
         if (loading_nodes.count(id)) {
-            // This is definitely a cycle
-            return nullptr;
+            throw archive_has_cycles{id};
         }
 
         if (auto* p = inners_.find(id)) {
@@ -153,7 +159,7 @@ private:
 
         auto* node_info = ar_.inners.find(id);
         if (!node_info) {
-            return nullptr;
+            throw invalid_node_id{id};
         }
 
         loading_nodes = std::move(loading_nodes).insert(id);
@@ -161,7 +167,7 @@ private:
         const auto n         = node_info->children.size();
         constexpr auto max_n = immer::detail::rbts::branches<B>;
         if (n > max_n) {
-            return nullptr;
+            throw invalid_children_count{id};
         }
 
         auto inner    = node_ptr{node_t::make_inner_n(n),
@@ -169,11 +175,7 @@ private:
         auto children = immer::vector<node_ptr>{};
         auto index    = std::size_t{};
         for (const auto& child_node_id : node_info->children) {
-            auto child = load_some_node(child_node_id, loading_nodes);
-            if (!child) {
-                throw std::invalid_argument{
-                    fmt::format("Failed to load node ID {}", child_node_id)};
-            }
+            auto child    = load_some_node(child_node_id, loading_nodes);
             auto* raw_ptr = child.get();
             children      = std::move(children).push_back(std::move(child));
             inner.get()->inner()[index] = raw_ptr;
@@ -191,8 +193,7 @@ private:
     node_ptr load_relaxed(node_id id, nodes_set_t loading_nodes)
     {
         if (loading_nodes.count(id)) {
-            // This is definitely a cycle
-            return nullptr;
+            throw archive_has_cycles{id};
         }
 
         if (auto* p = inners_.find(id)) {
@@ -201,7 +202,7 @@ private:
 
         auto* node_info = ar_.relaxed_inners.find(id);
         if (!node_info) {
-            return nullptr;
+            throw invalid_node_id{id};
         }
 
         loading_nodes = std::move(loading_nodes).insert(id);
@@ -209,7 +210,7 @@ private:
         const auto n         = node_info->children.size();
         constexpr auto max_n = immer::detail::rbts::branches<B>;
         if (n > max_n) {
-            return nullptr;
+            throw invalid_children_count{id};
         }
 
         auto relaxed = node_ptr{node_t::make_inner_r_n(n), [n](auto* ptr) {
@@ -221,10 +222,6 @@ private:
         auto running_size                 = std::size_t{};
         for (const auto& child_node_id : node_info->children) {
             auto child = load_some_node(child_node_id, loading_nodes);
-            if (!child) {
-                throw std::invalid_argument{
-                    fmt::format("Failed to load node ID {}", child_node_id)};
-            }
             running_size += get_node_size(child_node_id);
 
             auto* raw_ptr = child.get();
@@ -255,7 +252,7 @@ private:
         if (ar_.relaxed_inners.count(id)) {
             return load_relaxed(id, std::move(loading_nodes));
         }
-        return nullptr;
+        throw invalid_node_id{id};
     }
 
     std::size_t get_node_size(node_id id)
@@ -311,13 +308,8 @@ private:
                     const auto expected_count = pos.count();
                     const auto real_count     = info->children.size();
                     if (expected_count != real_count) {
-                        throw std::invalid_argument{
-                            fmt::format("Loaded vector is corrupted. Inner "
-                                        "node ID {} should "
-                                        "have {} children but it has {}",
-                                        *id,
-                                        expected_count,
-                                        real_count)};
+                        throw vector_corrupted_exception{
+                            *id, expected_count, real_count};
                     }
 
                     pos.each(detail::visitor_helper{},

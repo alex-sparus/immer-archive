@@ -20,11 +20,6 @@ public:
         ptr->inc();
     }
 
-    node_ptr(std::nullptr_t)
-        : ptr{nullptr}
-    {
-    }
-
     node_ptr(const node_ptr& other)
         : ptr{other.ptr}
         , deleter{other.deleter}
