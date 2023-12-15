@@ -8,7 +8,6 @@
   catch2_3,
   boost,
   nlohmann_json,
-  re2,
   immer,
 }:
 stdenv.mkDerivation rec {
@@ -22,7 +21,6 @@ stdenv.mkDerivation rec {
     catch2_3
     boost
     nlohmann_json
-    re2
     immer
   ];
 

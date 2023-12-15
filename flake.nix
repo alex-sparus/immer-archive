@@ -66,6 +66,7 @@
           fmt_9
           catch2_3
           boost
+          nlohmann_json
           immer.defaultPackage.${system}
 
           # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
