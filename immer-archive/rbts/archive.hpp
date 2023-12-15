@@ -54,21 +54,13 @@ struct leaf_node_save
 struct inner_node
 {
     immer::vector<node_id> children;
+    bool relaxed = {};
+
+    auto tie() const { return std::tie(children, relaxed); }
 
     friend bool operator==(const inner_node& left, const inner_node& right)
     {
-        return left.children == right.children;
-    }
-};
-
-struct relaxed_inner_node
-{
-    immer::vector<node_id> children;
-
-    friend bool operator==(const relaxed_inner_node& left,
-                           const relaxed_inner_node& right)
-    {
-        return left.children == right.children;
+        return left.tie() == right.tie();
     }
 };
 
@@ -143,7 +135,6 @@ struct archive_save
 {
     immer::map<node_id, leaf_node_save<T>> leaves;
     immer::map<node_id, inner_node> inners;
-    immer::map<node_id, relaxed_inner_node> relaxed_inners;
     immer::map<node_id, vector_save<T>> vectors;
     immer::map<node_id, flex_vector_save<T>> flex_vectors;
 
@@ -156,14 +147,10 @@ struct archive_load
 {
     immer::map<node_id, leaf_node_load<T>> leaves;
     immer::map<node_id, inner_node> inners;
-    immer::map<node_id, relaxed_inner_node> relaxed_inners;
     immer::map<node_id, vector_load<T>> vectors;
     immer::map<node_id, flex_vector_load<T>> flex_vectors;
 
-    auto tie() const
-    {
-        return std::tie(leaves, inners, relaxed_inners, vectors, flex_vectors);
-    }
+    auto tie() const { return std::tie(leaves, inners, vectors, flex_vectors); }
 
     friend bool operator==(const archive_load& left, const archive_load& right)
     {
@@ -202,11 +189,10 @@ archive_load<T> fix_leaf_nodes(archive_save<T> ar)
     }
 
     return {
-        .leaves         = std::move(leaves),
-        .inners         = std::move(ar.inners),
-        .relaxed_inners = std::move(ar.relaxed_inners),
-        .vectors        = std::move(vectors),
-        .flex_vectors   = std::move(flex_vectors),
+        .leaves       = std::move(leaves),
+        .inners       = std::move(ar.inners),
+        .vectors      = std::move(vectors),
+        .flex_vectors = std::move(flex_vectors),
     };
 }
 
@@ -245,14 +231,8 @@ template <class Archive>
 void serialize(Archive& ar, inner_node& value)
 {
     auto& children = value.children;
-    ar(CEREAL_NVP(children));
-}
-
-template <class Archive>
-void serialize(Archive& ar, relaxed_inner_node& value)
-{
-    auto& children = value.children;
-    ar(CEREAL_NVP(children));
+    auto& relaxed  = value.relaxed;
+    ar(CEREAL_NVP(children), CEREAL_NVP(relaxed));
 }
 
 template <class Archive>
@@ -308,14 +288,12 @@ void load(Archive& ar, flex_vector_load<T>& value)
 template <class Archive, class... T>
 void save(Archive& ar, const archive_save<T...>& value)
 {
-    auto& leaves         = value.leaves;
-    auto& inners         = value.inners;
-    auto& relaxed_inners = value.relaxed_inners;
-    auto& vectors        = value.vectors;
-    auto& flex_vectors   = value.flex_vectors;
+    auto& leaves       = value.leaves;
+    auto& inners       = value.inners;
+    auto& vectors      = value.vectors;
+    auto& flex_vectors = value.flex_vectors;
     ar(CEREAL_NVP(leaves),
        CEREAL_NVP(inners),
-       CEREAL_NVP(relaxed_inners),
        CEREAL_NVP(vectors),
        CEREAL_NVP(flex_vectors));
 }
@@ -323,14 +301,12 @@ void save(Archive& ar, const archive_save<T...>& value)
 template <class Archive, class... T>
 void load(Archive& ar, archive_load<T...>& value)
 {
-    auto& leaves         = value.leaves;
-    auto& inners         = value.inners;
-    auto& relaxed_inners = value.relaxed_inners;
-    auto& vectors        = value.vectors;
-    auto& flex_vectors   = value.flex_vectors;
+    auto& leaves       = value.leaves;
+    auto& inners       = value.inners;
+    auto& vectors      = value.vectors;
+    auto& flex_vectors = value.flex_vectors;
     ar(CEREAL_NVP(leaves),
        CEREAL_NVP(inners),
-       CEREAL_NVP(relaxed_inners),
        CEREAL_NVP(vectors),
        CEREAL_NVP(flex_vectors));
 }

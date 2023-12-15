@@ -151,17 +151,39 @@ private:
             throw invalid_children_count{id};
         }
 
-        auto inner    = node_ptr{node_t::make_inner_n(n),
-                              [n](auto* ptr) { node_t::delete_inner(ptr, n); }};
+        auto inner =
+            node_info->relaxed
+                ? node_ptr{node_t::make_inner_r_n(n),
+                           [n](auto* ptr) { node_t::delete_inner_r(ptr, n); }}
+                : node_ptr{node_t::make_inner_n(n),
+                           [n](auto* ptr) { node_t::delete_inner(ptr, n); }};
         auto children = immer::vector<node_ptr>{};
-        auto index    = std::size_t{};
-        for (const auto& child_node_id : node_info->children) {
-            auto child    = load_some_node(child_node_id, loading_nodes);
-            auto* raw_ptr = child.get();
-            children      = std::move(children).push_back(std::move(child));
-            inner.get()->inner()[index] = raw_ptr;
-            ++index;
+
+        if (node_info->relaxed) {
+            inner.get()->relaxed()->d.count = n;
+            auto index                      = std::size_t{};
+            auto running_size               = std::size_t{};
+            for (const auto& child_node_id : node_info->children) {
+                auto child = load_some_node(child_node_id, loading_nodes);
+                running_size += get_node_size(child_node_id);
+
+                auto* raw_ptr = child.get();
+                children      = std::move(children).push_back(std::move(child));
+                inner.get()->inner()[index]            = raw_ptr;
+                inner.get()->relaxed()->d.sizes[index] = running_size;
+                ++index;
+            }
+        } else {
+            auto index = std::size_t{};
+            for (const auto& child_node_id : node_info->children) {
+                auto child    = load_some_node(child_node_id, loading_nodes);
+                auto* raw_ptr = child.get();
+                children      = std::move(children).push_back(std::move(child));
+                inner.get()->inner()[index] = raw_ptr;
+                ++index;
+            }
         }
+
         inners_        = std::move(inners_).set(id,
                                          inner_node_ptr{
                                                     .node     = inner,
@@ -169,56 +191,6 @@ private:
                                          });
         loaded_inners_ = std::move(loaded_inners_).set(inner.get(), id);
         return inner;
-    }
-
-    node_ptr load_relaxed(node_id id, nodes_set_t loading_nodes)
-    {
-        if (loading_nodes.count(id)) {
-            throw archive_has_cycles{id};
-        }
-
-        if (auto* p = inners_.find(id)) {
-            return p->node;
-        }
-
-        auto* node_info = ar_.relaxed_inners.find(id);
-        if (!node_info) {
-            throw invalid_node_id{id};
-        }
-
-        loading_nodes = std::move(loading_nodes).insert(id);
-
-        const auto n         = node_info->children.size();
-        constexpr auto max_n = immer::detail::rbts::branches<B>;
-        if (n > max_n) {
-            throw invalid_children_count{id};
-        }
-
-        auto relaxed = node_ptr{node_t::make_inner_r_n(n), [n](auto* ptr) {
-                                    node_t::delete_inner_r(ptr, n);
-                                }};
-        relaxed.get()->relaxed()->d.count = n;
-        auto children                     = immer::vector<node_ptr>{};
-        auto index                        = std::size_t{};
-        auto running_size                 = std::size_t{};
-        for (const auto& child_node_id : node_info->children) {
-            auto child = load_some_node(child_node_id, loading_nodes);
-            running_size += get_node_size(child_node_id);
-
-            auto* raw_ptr = child.get();
-            children      = std::move(children).push_back(std::move(child));
-            relaxed.get()->inner()[index]            = raw_ptr;
-            relaxed.get()->relaxed()->d.sizes[index] = running_size;
-            ++index;
-        }
-        inners_ = std::move(inners_).set(id,
-                                         inner_node_ptr{
-                                             .node     = relaxed,
-                                             .children = std::move(children),
-                                         });
-        loaded_relaxed_inners_ =
-            std::move(loaded_relaxed_inners_).set(relaxed.get(), id);
-        return relaxed;
     }
 
     node_ptr load_some_node(node_id id, nodes_set_t loading_nodes)
@@ -229,9 +201,6 @@ private:
         }
         if (ar_.inners.count(id)) {
             return load_strict(id, std::move(loading_nodes));
-        }
-        if (ar_.relaxed_inners.count(id)) {
-            return load_relaxed(id, std::move(loading_nodes));
         }
         throw invalid_node_id{id};
     }
@@ -252,14 +221,7 @@ private:
                 }
                 return result;
             }
-            if (auto* p = ar_.relaxed_inners.find(id)) {
-                auto result = std::size_t{};
-                for (const auto& child_id : p->children) {
-                    result += get_node_size(child_id);
-                }
-                return result;
-            }
-            throw std::invalid_argument{"Invalid node id"};
+            throw invalid_node_id{id};
         }();
         sizes_ = std::move(sizes_).set(id, size);
         return size;
@@ -268,67 +230,43 @@ private:
     template <class Tree>
     void verify_tree(const Tree& impl) const
     {
+        const auto check_inner = [&](auto&& pos, auto&& visit) {
+            const auto* id = loaded_inners_.find(pos.node());
+            assert(id);
+            if (!id) {
+                throw std::logic_error{"Inner node of a freshly loaded "
+                                       "vector is unknown"};
+            }
+            const auto* info = ar_.inners.find(*id);
+            assert(info);
+            if (!info) {
+                throw std::logic_error{
+                    "No info for the just loaded inner node"};
+            }
+
+            const auto expected_count = pos.count();
+            const auto real_count     = info->children.size();
+            if (expected_count != real_count) {
+                throw vector_corrupted_exception{
+                    *id, expected_count, real_count};
+            }
+
+            pos.each(detail::visitor_helper{},
+                     [&visit](auto any_tag, auto& child_pos, auto&&) {
+                         visit(child_pos);
+                     });
+        };
+
         impl.traverse(
             detail::visitor_helper{},
             boost::hana::overload(
                 [&](detail::regular_pos_tag, auto&& pos, auto&& visit) {
                     // SPDLOG_INFO("regular_pos_tag");
-                    const auto* id = loaded_inners_.find(pos.node());
-                    assert(id);
-                    if (!id) {
-                        throw std::logic_error{"Inner node of a freshly loaded "
-                                               "vector is unknown"};
-                    }
-                    const auto* info = ar_.inners.find(*id);
-                    assert(info);
-                    if (!info) {
-                        throw std::logic_error{
-                            "No info for the just loaded inner node"};
-                    }
-
-                    const auto expected_count = pos.count();
-                    const auto real_count     = info->children.size();
-                    if (expected_count != real_count) {
-                        throw vector_corrupted_exception{
-                            *id, expected_count, real_count};
-                    }
-
-                    pos.each(detail::visitor_helper{},
-                             [&visit](auto any_tag, auto& child_pos, auto&&) {
-                                 visit(child_pos);
-                             });
+                    check_inner(pos, visit);
                 },
                 [&](detail::relaxed_pos_tag, auto&& pos, auto&& visit) {
                     // SPDLOG_INFO("relaxed_pos_tag");
-                    const auto* id = loaded_relaxed_inners_.find(pos.node());
-                    assert(id);
-                    if (!id) {
-                        throw std::logic_error{"Relaxed node of a freshly "
-                                               "loaded vector is unknown"};
-                    }
-                    const auto* info = ar_.relaxed_inners.find(*id);
-                    assert(info);
-                    if (!info) {
-                        throw std::logic_error{
-                            "No info for the just loaded relaxed node"};
-                    }
-
-                    const auto expected_count = pos.count();
-                    const auto real_count     = info->children.size();
-                    if (expected_count != real_count) {
-                        throw std::invalid_argument{
-                            fmt::format("Loaded vector is corrupted. Inner "
-                                        "node ID {} should "
-                                        "have {} children but it has {}",
-                                        *id,
-                                        expected_count,
-                                        real_count)};
-                    }
-
-                    pos.each(detail::visitor_helper{},
-                             [&visit](auto any_tag, auto& child_pos, auto&&) {
-                                 visit(child_pos);
-                             });
+                    check_inner(pos, visit);
                 },
                 [&](detail::leaf_pos_tag, auto&& pos, auto&& visit) {
                     // SPDLOG_INFO("leaf_pos_tag");
@@ -364,7 +302,6 @@ private:
     immer::map<node_id, inner_node_ptr> inners_;
     immer::map<node_t*, node_id> loaded_leaves_;
     immer::map<node_t*, node_id> loaded_inners_;
-    immer::map<node_t*, node_id> loaded_relaxed_inners_;
     immer::map<node_id, std::size_t> sizes_;
 };
 

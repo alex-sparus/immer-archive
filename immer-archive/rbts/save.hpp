@@ -54,11 +54,13 @@ struct archive_builder
     void operator()(relaxed_pos_tag, Pos& pos, auto&& visit)
     {
         auto id = get_node_id(pos.node());
-        if (ar.relaxed_inners.count(id)) {
+        if (ar.inners.count(id)) {
             return;
         }
 
-        auto node_info = relaxed_inner_node{};
+        auto node_info = inner_node{
+            .relaxed = true,
+        };
 
         auto* node = pos.node();
         auto* r    = node->relaxed();
@@ -75,7 +77,7 @@ struct archive_builder
 
         assert(node_info.children.size() == r->d.count);
 
-        ar.relaxed_inners = std::move(ar.relaxed_inners).set(id, node_info);
+        ar.inners = std::move(ar.inners).set(id, node_info);
     }
 
     template <class Pos>
@@ -218,8 +220,7 @@ std::pair<archive_save<T>, node_id> save_to_archive(flex_vector_one<T> vec,
 
     archive = detail::save_nodes(impl, std::move(archive));
 
-    assert(archive.inners.count(root_id) ||
-           archive.relaxed_inners.count(root_id));
+    assert(archive.inners.count(root_id));
     assert(archive.leaves.count(tail_id));
 
     const auto vector_id = archive.rbts_to_id.size();

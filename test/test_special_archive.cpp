@@ -409,22 +409,19 @@ TEST_CASE("Special archive loads empty test_data")
             "archives": {
                 "ints": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
                 "flex_vectors": []
                 },
                 "strings": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
                 "flex_vectors": []
                 },
                 "flex_ints": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [],
                 "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
                 },
@@ -442,15 +439,13 @@ TEST_CASE("Special archive loads empty test_data")
                 },
                 "metas": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
                 "flex_vectors": []
                 },
                 "meta_metas": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
                 "flex_vectors": []
                 },
@@ -489,22 +484,19 @@ TEST_CASE("Special archive throws cereal::Exception")
             "archives": {
                 "ints": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
                 "flex_vectors": []
                 },
                 "strings": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
                 "flex_vectors": []
                 },
                 "flex_ints": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [],
                 "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
                 },
@@ -522,15 +514,13 @@ TEST_CASE("Special archive throws cereal::Exception")
                 },
                 "metas": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
                 "flex_vectors": []
                 },
                 "meta_metas": {
                 "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": []}}],
-                "relaxed_inners": [],
+                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
                 "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
                 "flex_vectors": []
                 },

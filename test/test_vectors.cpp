@@ -389,9 +389,8 @@ TEST_CASE("Invalid root id")
                     { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1 ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4, "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
+                    { "key": 0, "value": { "children": [ 2, 3, 4 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 1, "tail": 1, "shift": 1 } }
                 ],
@@ -409,9 +408,8 @@ TEST_CASE("Invalid tail id")
                     { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1 ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4, "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
+                    { "key": 0, "value": { "children": [ 2, 3, 4 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 999, "shift": 1 } }
                 ],
@@ -431,9 +429,8 @@ TEST_CASE("Node has itself as a child")
                     "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 0, 4 ] } }
+                    { "key": 0, "value": { "children": [ 2, 0, 4 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
@@ -694,7 +691,8 @@ TEST_CASE("A loop with 2 nodes")
                     "children": [
                         2,
                         35
-                    ]
+                    ],
+                    "relaxed": false
                 }
             },
             {
@@ -702,17 +700,18 @@ TEST_CASE("A loop with 2 nodes")
                 "value": {
                     "children": [
                         36, 0
-                    ]
+                    ],
+                    "relaxed": false
                 }
             },
             {
                 "key": 2,
                 "value": {
-                    "children": [ 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 ]
+                    "children": [ 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 ],
+                    "relaxed": false
                 }
             }
         ],
-        "relaxed_inners": [],
         "vectors": [],
         "flex_vectors": [
             {
@@ -831,9 +830,8 @@ TEST_CASE("Test simple valid vector")
                     "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
+                    { "key": 0, "value": { "children": [ 2, 3, 4 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
@@ -857,12 +855,12 @@ TEST_CASE("Test simple valid flex vector")
             {"key": 4, "value": [4, 5]},
             {"key": 5, "value": [6]}
             ],
-            "inners": [],
-            "relaxed_inners": [
+            "inners": [
             {
                 "key": 0,
                 "value": {
-                "children": [ 2, 3, 4, 5, 2, 3, 4 ]
+                "children": [ 2, 3, 4, 5, 2, 3, 4 ],
+                "relaxed": true
                 }
             }
             ],
@@ -897,9 +895,8 @@ TEST_CASE("A leaf with too few elements")
                     "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
+                    { "key": 0, "value": { "children": [ 2, 3, 4 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
@@ -923,12 +920,12 @@ TEST_CASE("A leaf with too few elements, flex")
             {"key": 3, "value": [2]},
             {"key": 4, "value": [4, 5]}
             ],
-            "inners": [],
-            "relaxed_inners": [
+            "inners": [
             {
                 "key": 0,
                 "value": {
-                "children": [ 2, 3, 4, 1, 2, 3, 4 ]
+                "children": [ 2, 3, 4, 1, 2, 3, 4 ],
+                "relaxed": true
                 }
             }
             ],
@@ -956,12 +953,12 @@ TEST_CASE("A leaf with no elements, flex")
             {"key": 3, "value": []},
             {"key": 4, "value": [4, 5]}
             ],
-            "inners": [],
-            "relaxed_inners": [
+            "inners": [
             {
                 "key": 0,
                 "value": {
-                "children": [ 2, 3, 4, 1, 2, 3, 4 ]
+                "children": [ 2, 3, 4, 1, 2, 3, 4 ],
+                "relaxed": true
                 }
             }
             ],
@@ -988,9 +985,8 @@ TEST_CASE("A tail with too few elements")
                     "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
+                    { "key": 0, "value": { "children": [ 2, 3, 4 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
@@ -1015,9 +1011,8 @@ TEST_CASE("A leaf with too many elements")
                     "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
+                    { "key": 0, "value": { "children": [ 2, 3, 4 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
@@ -1044,9 +1039,8 @@ TEST_CASE("An inner node with too many elements")
                         0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
                         0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
                         0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-                         ] } }
+                         ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
@@ -1068,8 +1062,7 @@ TEST_CASE("A relaxed node with too many elements")
             {"key": 4, "value": [4, 5]},
             {"key": 5, "value": [6]}
             ],
-            "inners": [],
-            "relaxed_inners": [
+            "inners": [
             {
                 "key": 0,
                 "value": {
@@ -1095,7 +1088,8 @@ TEST_CASE("A relaxed node with too many elements")
                     3, 4,
                     5, 2,
                     3, 4
-                ]
+                ],
+                "relaxed": true
                 }
             }
             ],
@@ -1121,9 +1115,8 @@ TEST_CASE("Too few children")
                     "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 4 ] } }
+                    { "key": 0, "value": { "children": [ 2, 4 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
@@ -1146,12 +1139,12 @@ TEST_CASE("Flex, removed one of children")
             {"key": 4, "value": [4, 5]},
             {"key": 5, "value": [6]}
             ],
-            "inners": [],
-            "relaxed_inners": [
+            "inners": [
             {
                 "key": 0,
                 "value": {
-                    "children": [ 2, 3, 4, 2, 3, 4 ]
+                    "children": [ 2, 3, 4, 2, 3, 4 ],
+                    "relaxed": true
                 }
             }
             ],
@@ -1180,9 +1173,8 @@ TEST_CASE("Test unknown child")
                     "value": [ 4, 5 ] }
                 ],
                 "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 9 ] } }
+                    { "key": 0, "value": { "children": [ 2, 3, 9 ], "relaxed": false } }
                 ],
-                "relaxed_inners": [],
                 "vectors": [
                     { "key": 0, "value": { "root": 0, "tail": 1,
                     "shift": 1 } }
