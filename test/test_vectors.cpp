@@ -919,9 +919,7 @@ TEST_CASE("Test modifying vector nodes")
         REQUIRE(item["key"] == 0);
         SECTION("Add too many")
         {
-            item["value"]["children"] = {
-                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+            item["value"]["children"] = std::vector<int>(33, 2);
             REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
                               immer_archive::invalid_children_count);
         }
@@ -940,197 +938,176 @@ TEST_CASE("Test modifying vector nodes")
     }
 }
 
-TEST_CASE("Test simple valid flex vector")
+TEST_CASE("Test modifying flex vector nodes")
 {
-    const auto json = std::string{R"({
-        "value0": {
-            "leaves": [
-            {"key": 1, "value": [6, 99]},
-            {"key": 2, "value": [0, 1]},
-            {"key": 3, "value": [2, 3]},
-            {"key": 4, "value": [4, 5]},
-            {"key": 5, "value": [6]}
-            ],
-            "inners": [
+    json_t data;
+    data["value0"]["leaves"] = {
+        {
+            {"key", 1},
+            {"value", {6, 99}},
+        },
+        {
+            {"key", 2},
+            {"value", {0, 1}},
+        },
+        {
+            {"key", 3},
+            {"value", {2, 3}},
+        },
+        {
+            {"key", 4},
+            {"value", {4, 5}},
+        },
+        {
+            {"key", 5},
+            {"value", {6}},
+        },
+    };
+    data["value0"]["inners"] = {
+        {
+            {"key", 0},
             {
-                "key": 0,
-                "value": {
-                "children": [ 2, 3, 4, 5, 2, 3, 4 ],
-                "relaxed": true
+                "value",
+                {
+                    {"children", {2, 3, 4, 5, 2, 3, 4}},
+                    {"relaxed", true},
+                },
+            },
+        },
+    };
+    data["value0"]["flex_vectors"] = {
+        {
+            {"key", 0},
+            {"value",
+             {
+                 {"root", 0},
+                 {"tail", 1},
+                 {"shift", 1},
+             }},
+        },
+    };
+    data["value0"]["vectors"] = json_t::array();
+
+    SECTION("Loads correctly")
+    {
+        const auto small_vec = gen(immer_archive::flex_vector_one<int>{}, 7);
+        const auto vec =
+            small_vec + small_vec + immer_archive::flex_vector_one<int>{99};
+        REQUIRE(load_flex_vec(data.dump(), 0) == vec);
+    }
+    SECTION("Modify starting leaf")
+    {
+        auto& item = data["value0"]["leaves"][1];
+        REQUIRE(item["key"] == 2);
+        SECTION("One element")
+        {
+            item["value"] = {0};
+            const auto vec_234 =
+                immer_archive::flex_vector_one<int>{0, 2, 3, 4, 5};
+            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
+            const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
+            const auto vec    = vec_234 + leaf_5 + vec_234 + leaf_1;
+            REQUIRE(load_flex_vec(data.dump(), 0) == vec);
+        }
+
+        // Empty starting leaf triggers a separate branch in the code, actually.
+        SECTION("Empty leaf")
+        {
+            item["value"] = json_t::array();
+            const auto vec_234 =
+                immer_archive::flex_vector_one<int>{2, 3, 4, 5};
+            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
+            const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
+            const auto vec    = vec_234 + leaf_5 + vec_234 + leaf_1;
+            REQUIRE(load_flex_vec(data.dump(), 0) == vec);
+        }
+    }
+    SECTION("Modify second leaf")
+    {
+        auto& item = data["value0"]["leaves"][2];
+        REQUIRE(item["key"] == 3);
+        SECTION("One element")
+        {
+            item["value"] = {2};
+            const auto vec_234 =
+                immer_archive::flex_vector_one<int>{0, 1, 2, 4, 5};
+            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
+            const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
+            const auto vec    = vec_234 + leaf_5 + vec_234 + leaf_1;
+            REQUIRE(load_flex_vec(data.dump(), 0) == vec);
+        }
+        SECTION("Empty leaf")
+        {
+            item["value"] = json_t::array();
+            const auto vec_234 =
+                immer_archive::flex_vector_one<int>{0, 1, 4, 5};
+            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
+            const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
+            const auto vec    = vec_234 + leaf_5 + vec_234 + leaf_1;
+            REQUIRE(load_flex_vec(data.dump(), 0) == vec);
+        }
+    }
+    SECTION("Modify inner node")
+    {
+        auto& item = data["value0"]["inners"][0];
+        REQUIRE(item["key"] == 0);
+        SECTION("No children")
+        {
+            item["value"]["children"] = json_t::array();
+            // There was a problem when an empty relaxed node triggered an
+            // assert, while non-relaxed worked fine.
+            const auto is_relaxed    = GENERATE(false, true);
+            item["value"]["relaxed"] = is_relaxed;
+            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
+            REQUIRE(load_flex_vec(data.dump(), 0) == leaf_1);
+        }
+        SECTION("Too many children")
+        {
+            item["value"]["children"] = std::vector<int>(40, 3);
+            const auto is_relaxed     = GENERATE(false, true);
+            item["value"]["relaxed"]  = is_relaxed;
+            REQUIRE_THROWS_AS(load_flex_vec(data.dump(), 0),
+                              immer_archive::invalid_children_count);
+        }
+        SECTION("Remove a child")
+        {
+            SECTION("All leaves are full, non-relaxed works")
+            {
+                item["value"]["children"] = {2, 3, 4, 2, 3, 4};
+                const auto is_relaxed     = GENERATE(false, true);
+                item["value"]["relaxed"]  = is_relaxed;
+                const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
+                const auto vec_234 =
+                    immer_archive::flex_vector_one<int>{0, 1, 2, 3, 4, 5};
+                const auto vec = vec_234 + vec_234 + leaf_1;
+                REQUIRE(load_flex_vec(data.dump(), 0) == vec);
+            }
+            SECTION("Relaxed leaf")
+            {
+                item["value"]["children"] = {2, 3, 5, 3};
+                SECTION("Non-relaxed breaks")
+                {
+                    item["value"]["relaxed"] = false;
+                    REQUIRE_THROWS_AS(
+                        load_flex_vec(data.dump(), 0),
+                        immer_archive::rbts::vector_corrupted_exception);
+                }
+                SECTION("Relaxed works")
+                {
+                    const auto leaf_1 =
+                        immer_archive::flex_vector_one<int>{6, 99};
+                    const auto leaf_2 =
+                        immer_archive::flex_vector_one<int>{0, 1};
+                    const auto leaf_3 =
+                        immer_archive::flex_vector_one<int>{2, 3};
+                    const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
+
+                    const auto vec = leaf_2 + leaf_3 + leaf_5 + leaf_3 + leaf_1;
+                    REQUIRE(load_flex_vec(data.dump(), 0) == vec);
                 }
             }
-            ],
-            "vectors": [],
-            "flex_vectors": [
-            {"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}
-            ]
         }
-        })"};
-
-    const auto small_vec = gen(immer_archive::flex_vector_one<int>{}, 7);
-    const auto vec =
-        small_vec + small_vec + immer_archive::flex_vector_one<int>{99};
-    // {
-    //     auto ar           = immer_archive::rbts::archive_save<int>{};
-    //     auto id1          = immer_archive::rbts::node_id{};
-    //     std::tie(ar, id1) = save_to_archive(vec, ar);
-
-    //     REQUIRE(to_json(ar) == "");
-    // }
-    REQUIRE(load_flex_vec(json, 0) == vec);
-}
-
-TEST_CASE("A leaf with too few elements, flex")
-{
-    // Leaf #3 should have two elements, but it has only one.
-    // It works fine with the relaxed node.
-    const auto json = std::string{R"({
-        "value0": {
-            "leaves": [
-            {"key": 1, "value": [6]},
-            {"key": 2, "value": [0, 1]},
-            {"key": 3, "value": [2]},
-            {"key": 4, "value": [4, 5]}
-            ],
-            "inners": [
-            {
-                "key": 0,
-                "value": {
-                "children": [ 2, 3, 4, 1, 2, 3, 4 ],
-                "relaxed": true
-                }
-            }
-            ],
-            "vectors": [],
-            "flex_vectors": [
-            {"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}
-            ]
-        }
-        })"};
-
-    const auto vec =
-        immer_archive::flex_vector_one<int>{0, 1, 2, 4, 5, 6, 0, 1, 2, 4, 5, 6};
-    REQUIRE(load_flex_vec(json, 0) == vec);
-}
-
-TEST_CASE("A leaf with no elements, flex")
-{
-    // Leaf #3 is empty.
-    // It works fine with the relaxed node.
-    const auto json = std::string{R"({
-        "value0": {
-            "leaves": [
-            {"key": 1, "value": [6]},
-            {"key": 2, "value": [0, 1]},
-            {"key": 3, "value": []},
-            {"key": 4, "value": [4, 5]}
-            ],
-            "inners": [
-            {
-                "key": 0,
-                "value": {
-                "children": [ 2, 3, 4, 1, 2, 3, 4 ],
-                "relaxed": true
-                }
-            }
-            ],
-            "vectors": [],
-            "flex_vectors": [
-            {"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}
-            ]
-        }
-        })"};
-
-    const auto vec =
-        immer_archive::flex_vector_one<int>{0, 1, 4, 5, 6, 0, 1, 4, 5, 6};
-    REQUIRE(load_flex_vec(json, 0) == vec);
-}
-
-TEST_CASE("A relaxed node with too many elements")
-{
-    const auto json = std::string{R"({
-        "value0": {
-            "leaves": [
-            {"key": 1, "value": [6, 99]},
-            {"key": 2, "value": [0, 1]},
-            {"key": 3, "value": [2, 3]},
-            {"key": 4, "value": [4, 5]},
-            {"key": 5, "value": [6]}
-            ],
-            "inners": [
-            {
-                "key": 0,
-                "value": {
-                "children": [
-                    2, 3,
-                    4, 5,
-                    2, 3,
-                    4, 2,
-                    3, 4,
-                    5, 2,
-                    3, 4,
-                    2, 3,
-                    4, 5,
-                    2, 3,
-                    4, 2,
-                    3, 4,
-                    5, 2,
-                    3, 4,
-                    2, 3,
-                    4, 5,
-                    2, 3,
-                    4, 2,
-                    3, 4,
-                    5, 2,
-                    3, 4
-                ],
-                "relaxed": true
-                }
-            }
-            ],
-            "vectors": [],
-            "flex_vectors": [
-            {"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}
-            ]
-        }
-        })"};
-    REQUIRE_THROWS_AS(load_flex_vec(json, 0),
-                      immer_archive::invalid_children_count);
-}
-
-TEST_CASE("Flex, removed one of children")
-{
-    const auto json = std::string{R"({
-        "value0": {
-            "leaves": [
-            {"key": 1, "value": [6, 99]},
-            {"key": 2, "value": [0, 1]},
-            {"key": 3, "value": [2, 3]},
-            {"key": 4, "value": [4, 5]},
-            {"key": 5, "value": [6]}
-            ],
-            "inners": [
-            {
-                "key": 0,
-                "value": {
-                    "children": [ 2, 3, 4, 2, 3, 4 ],
-                    "relaxed": false
-                }
-            }
-            ],
-            "vectors": [],
-            "flex_vectors": [
-            {"key": 0, "value": {"root": 0, "tail": 1, "shift":
-            1}}
-            ]
-        }
-        })"};
-
-    const auto children_234 =
-        immer_archive::flex_vector_one<int>{0, 1, 2, 3, 4, 5};
-    const auto vec = children_234 + children_234 +
-                     immer_archive::flex_vector_one<int>{6, 99};
-    REQUIRE(load_flex_vec(json, 0) == vec);
+    }
 }
 
 // TEST_CASE("Test corrupted shift")
