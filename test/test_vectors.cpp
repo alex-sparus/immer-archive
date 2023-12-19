@@ -5,6 +5,7 @@
 //  Created by Alex Shabalin on 11/10/2023.
 //
 
+#include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
@@ -14,6 +15,7 @@
 #include <test/utils.hpp>
 
 #include <boost/hana.hpp>
+#include <boost/hana/ext/std/tuple.hpp>
 #include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
@@ -40,7 +42,8 @@ auto load_flex_vec(const auto& json, auto vec_id)
 
 using namespace test;
 using immer_archive::rbts::save_to_archive;
-using json_t = nlohmann::json;
+using json_t   = nlohmann::json;
+namespace hana = boost::hana;
 
 TEST_CASE("Save and load multiple times into the same archive")
 {
@@ -1106,6 +1109,140 @@ TEST_CASE("Test modifying flex vector nodes")
                     REQUIRE(load_flex_vec(data.dump(), 0) == vec);
                 }
             }
+        }
+    }
+}
+
+TEST_CASE("Print shift calculation", "[.print_shift]")
+{
+    // It starts with BL, which is 1.
+    // Then grows by B, which is 5 by default.
+    // size [0, 66], shift 1
+    // size [67, 2050], shift 6
+    // size [2051, 65538], shift 11
+    auto vec        = example_vector{};
+    auto last_shift = vec.impl().shift;
+    for (auto index = 0; index < 90000; ++index) {
+        vec              = vec.push_back(index);
+        const auto shift = vec.impl().shift;
+        if (shift != last_shift) {
+            SPDLOG_INFO("size {}, shift {}", vec.size(), shift);
+            last_shift = shift;
+        }
+    }
+}
+
+namespace {
+template <class B_BL>
+struct verify_shift_calculation
+{
+    static bool run()
+    {
+        using namespace hana::literals;
+        constexpr auto B  = hana::value<decltype(std::declval<B_BL>()[0_c])>();
+        constexpr auto BL = hana::value<decltype(std::declval<B_BL>()[1_c])>();
+        using Vector = immer::vector<int, immer::default_memory_policy, B, BL>;
+        auto vec     = Vector{};
+        constexpr auto max_vector_length = 90000;
+        for (auto index = 0; index < max_vector_length; ++index) {
+            INFO("B = " << B);
+            INFO("BL = " << BL);
+            INFO("size = " << vec.size());
+            REQUIRE(vec.impl().shift ==
+                    immer_archive::rbts::get_shift_for_size<B, BL>(vec.size()));
+        }
+        return true;
+    }
+};
+} // namespace
+
+// Generate a tuple of pairs (B, BL) for each B [3, 7] and BL [1, 5].
+using Bs_BLs = decltype([] {
+    constexpr auto bs   = hana::range_c<immer::detail::rbts::bits_t, 3, 8>;
+    constexpr auto bls  = hana::range_c<immer::detail::rbts::bits_t, 1, 6>;
+    constexpr auto prod = hana::cartesian_product(hana::make_tuple(bs, bls));
+    return hana::to<hana::ext::std::tuple_tag>(prod);
+}());
+
+TEMPLATE_LIST_TEST_CASE_METHOD(verify_shift_calculation,
+                               "Verify shift calculation",
+                               "[shift][slow]",
+                               Bs_BLs)
+{
+    REQUIRE(verify_shift_calculation<TestType>::run());
+}
+
+TEST_CASE("Test more inner nodes")
+{
+    json_t data;
+    data["value0"]["leaves"] = {
+        {{"key", 32}, {"value", {58, 59}}}, {{"key", 34}, {"value", {62, 63}}},
+        {{"key", 3}, {"value", {0, 1}}},    {{"key", 5}, {"value", {4, 5}}},
+        {{"key", 6}, {"value", {6, 7}}},    {{"key", 7}, {"value", {8, 9}}},
+        {{"key", 8}, {"value", {10, 11}}},  {{"key", 9}, {"value", {12, 13}}},
+        {{"key", 10}, {"value", {14, 15}}}, {{"key", 11}, {"value", {16, 17}}},
+        {{"key", 12}, {"value", {18, 19}}}, {{"key", 13}, {"value", {20, 21}}},
+        {{"key", 14}, {"value", {22, 23}}}, {{"key", 15}, {"value", {24, 25}}},
+        {{"key", 16}, {"value", {26, 27}}}, {{"key", 17}, {"value", {28, 29}}},
+        {{"key", 18}, {"value", {30, 31}}}, {{"key", 19}, {"value", {32, 33}}},
+        {{"key", 20}, {"value", {34, 35}}}, {{"key", 21}, {"value", {36, 37}}},
+        {{"key", 22}, {"value", {38, 39}}}, {{"key", 23}, {"value", {40, 41}}},
+        {{"key", 24}, {"value", {42, 43}}}, {{"key", 25}, {"value", {44, 45}}},
+        {{"key", 26}, {"value", {46, 47}}}, {{"key", 27}, {"value", {48, 49}}},
+        {{"key", 28}, {"value", {50, 51}}}, {{"key", 29}, {"value", {52, 53}}},
+        {{"key", 30}, {"value", {54, 55}}}, {{"key", 31}, {"value", {56, 57}}},
+        {{"key", 1}, {"value", {66}}},      {{"key", 33}, {"value", {60, 61}}},
+        {{"key", 4}, {"value", {2, 3}}},    {{"key", 36}, {"value", {64, 65}}},
+    };
+    data["value0"]["inners"] = {
+        {{"key", 0}, {"value", {{"children", {2, 35}}, {"relaxed", false}}}},
+        {{"key", 2},
+         {"value",
+          {{"children",
+            {3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18,
+             19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34}},
+           {"relaxed", false}}}},
+        {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", false}}}},
+    };
+    data["value0"]["vectors"] = {
+        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}, {"shift", 6}}}}};
+    data["value0"]["flex_vectors"] = json_t::array();
+
+    SECTION("Loads correctly")
+    {
+        REQUIRE(load_vec(data.dump(), 0) == gen(example_vector{}, 67));
+    }
+    SECTION("Throw in some empty nodes")
+    {
+        // Empty leaf #205
+        data["value0"]["leaves"].push_back(
+            {{"key", 205}, {"value", json_t::array()}});
+        // Inner node #560 referencing the empty leaf
+        data["value0"]["inners"].push_back(
+            {{"key", 560},
+             {"value", {{"children", {205}}, {"relaxed", false}}}});
+        auto& item = data["value0"]["inners"][0];
+        SECTION("Three nodes")
+        {
+            item["value"]["children"] = {2, 560, 35};
+            REQUIRE(load_vec(data.dump(), 0) == gen(example_vector{}, 67));
+        }
+        SECTION("Empty first")
+        {
+            FAIL("Fix this test");
+            item["value"]["children"] = {560, 35};
+            REQUIRE_NOTHROW(load_vec(data.dump(), 0));
+            for (auto i : load_vec(data.dump(), 0)) {
+                SPDLOG_INFO(i);
+            }
+            REQUIRE(1 == 2);
+            // REQUIRE(load_vec(data.dump(), 0) == example_vector{64, 65, 66});
+        }
+        SECTION("Empty last")
+        {
+            FAIL("Fix this test");
+            item["value"]["children"] = {35, 560};
+            REQUIRE(load_vec(data.dump(), 0) == example_vector{64, 65, 66});
         }
     }
 }
