@@ -26,16 +26,18 @@ auto load_vec(const auto& json, auto vec_id)
 {
     const auto archive =
         test::from_json<immer_archive::rbts::archive_load<int>>(json);
-    auto loader = immer_archive::rbts::loader<int>{archive};
-    return loader.load_vector(vec_id);
+    auto loader =
+        immer_archive::rbts::make_loader_for(test::example_vector{}, archive);
+    return loader.load(vec_id);
 }
 
 auto load_flex_vec(const auto& json, auto vec_id)
 {
     const auto archive =
         test::from_json<immer_archive::rbts::archive_load<int>>(json);
-    auto loader = immer_archive::rbts::loader<int>{archive};
-    return loader.load_flex_vector(vec_id);
+    auto loader = immer_archive::rbts::make_loader_for(
+        test::example_flex_vector{}, archive);
+    return loader.load(vec_id);
 }
 
 } // namespace
@@ -53,8 +55,8 @@ TEST_CASE("Save and load multiple times into the same archive")
         // gen(example_vector{}, 4)
         example_vector{},
     };
-    auto counter             = std::size_t{};
-    auto ar                  = immer_archive::rbts::archive_save<int>{};
+    auto counter = std::size_t{};
+    auto ar      = immer_archive::rbts::make_save_archive_for(example_vector{});
     const auto save_and_load = [&]() {
         const auto vec = test_vectors.back().push_back(++counter);
         test_vectors.push_back(vec);
@@ -64,8 +66,8 @@ TEST_CASE("Save and load multiple times into the same archive")
 
         SPDLOG_DEBUG("start test size {}", vec.size());
         {
-            auto loader = std::make_optional(
-                immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)});
+            auto loader =
+                std::make_optional(example_loader{fix_leaf_nodes(ar)});
             auto loaded_vec = loader->load_vector(vector_id);
             REQUIRE(loaded_vec == vec);
         }
@@ -93,9 +95,9 @@ TEST_CASE("Save and load vectors with shared nodes")
 
     // Save them
     const auto save_vectors = [](const auto& vectors)
-        -> std::pair<immer_archive::rbts::archive_save<int>,
+        -> std::pair<example_archive_save,
                      std::vector<immer_archive::rbts::node_id>> {
-        auto ar  = immer_archive::rbts::archive_save<int>{};
+        auto ar  = example_archive_save{};
         auto ids = std::vector<immer_archive::rbts::node_id>{};
         for (const auto& v : vectors) {
             auto [ar2, id] = save_to_archive(v, ar);
@@ -117,7 +119,7 @@ TEST_CASE("Save and load vectors with shared nodes")
     }
 
     // Load them and verify they're equal to the original vectors
-    auto loader = immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+    auto loader = example_loader{fix_leaf_nodes(ar)};
     std::vector<example_vector> loaded;
     auto index = std::size_t{};
     for (const auto& id : ids) {
@@ -163,9 +165,8 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
     };
 
     // Save them
-    const auto save_vectors = [](immer_archive::rbts::archive_save<int> ar,
-                                 const auto& vectors)
-        -> std::pair<immer_archive::rbts::archive_save<int>,
+    const auto save_vectors = [](example_archive_save ar, const auto& vectors)
+        -> std::pair<example_archive_save,
                      std::vector<immer_archive::rbts::node_id>> {
         auto ids = std::vector<immer_archive::rbts::node_id>{};
         for (const auto& v : vectors) {
@@ -177,7 +178,7 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
         return {std::move(ar), std::move(ids)};
     };
 
-    auto ar                  = immer_archive::rbts::archive_save<int>{};
+    auto ar                  = example_archive_save{};
     const auto vectors       = generate_vectors();
     const auto flex_vectors  = generate_flex_vectors();
     auto vector_ids          = std::vector<immer_archive::rbts::node_id>{};
@@ -198,7 +199,7 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
     }
 
     // Load them and verify they're equal to the original vectors
-    auto loader = immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+    auto loader = example_loader{fix_leaf_nodes(ar)};
     auto loaded = [&] {
         auto result = std::vector<example_vector>{};
         auto index  = std::size_t{};
@@ -232,7 +233,7 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
 TEST_CASE("Archive in-place mutated vector")
 {
     auto vec          = example_vector{1, 2, 3};
-    auto ar           = immer_archive::rbts::archive_save<int>{};
+    auto ar           = example_archive_save{};
     auto id1          = immer_archive::rbts::node_id{};
     std::tie(ar, id1) = save_to_archive(vec, ar);
 
@@ -242,7 +243,7 @@ TEST_CASE("Archive in-place mutated vector")
 
     REQUIRE(id1 != id2);
 
-    auto loader        = immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+    auto loader        = example_loader{fix_leaf_nodes(ar)};
     const auto loaded1 = loader.load_vector(id1);
     const auto loaded2 = loader.load_vector(id2);
     REQUIRE(loaded2 == loaded1.push_back(90));
@@ -251,7 +252,7 @@ TEST_CASE("Archive in-place mutated vector")
 TEST_CASE("Archive in-place mutated flex_vector")
 {
     auto vec          = example_flex_vector{1, 2, 3};
-    auto ar           = immer_archive::rbts::archive_save<int>{};
+    auto ar           = example_archive_save{};
     auto id1          = immer_archive::rbts::node_id{};
     std::tie(ar, id1) = save_to_archive(vec, ar);
 
@@ -261,7 +262,7 @@ TEST_CASE("Archive in-place mutated flex_vector")
 
     REQUIRE(id1 != id2);
 
-    auto loader        = immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+    auto loader        = example_loader{fix_leaf_nodes(ar)};
     const auto loaded1 = loader.load_flex_vector(id1);
     const auto loaded2 = loader.load_flex_vector(id2);
     REQUIRE(loaded2 == loaded1.push_back(90));
@@ -269,16 +270,16 @@ TEST_CASE("Archive in-place mutated flex_vector")
 
 TEST_CASE("Test nodes reuse")
 {
-    const auto small_vec = gen(immer_archive::flex_vector_one<int>{}, 67);
+    const auto small_vec = gen(test::flex_vector_one<int>{}, 67);
     const auto big_vec   = small_vec + small_vec;
 
-    auto ar           = immer_archive::rbts::archive_save<int>{};
+    auto ar           = example_archive_save{};
     auto id1          = immer_archive::rbts::node_id{};
     std::tie(ar, id1) = save_to_archive(big_vec, ar);
 
     {
         // Loads correctly
-        auto loader = immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+        auto loader        = example_loader{fix_leaf_nodes(ar)};
         const auto loaded1 = loader.load_flex_vector(id1);
         REQUIRE(loaded1 == big_vec);
     }
@@ -300,15 +301,14 @@ TEST_CASE("Test saving and loading vectors of different lengths", "[slow]")
     SECTION("archive each vector by itself")
     {
         for_each_generated_length(
-            immer_archive::vector_one<int>{}, 350, [&](const auto& vec) {
-                auto ar           = immer_archive::rbts::archive_save<int>{};
+            test::vector_one<int>{}, 350, [&](const auto& vec) {
+                auto ar           = example_archive_save{};
                 auto id1          = immer_archive::rbts::node_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
                     // Loads correctly
-                    auto loader =
-                        immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+                    auto loader        = example_loader{fix_leaf_nodes(ar)};
                     const auto loaded1 = loader.load_vector(id1);
                     REQUIRE(loaded1 == vec);
                 }
@@ -317,16 +317,15 @@ TEST_CASE("Test saving and loading vectors of different lengths", "[slow]")
 
     SECTION("keep archiving into the same archive")
     {
-        auto ar = immer_archive::rbts::archive_save<int>{};
+        auto ar = example_archive_save{};
         for_each_generated_length(
-            immer_archive::vector_one<int>{}, 350, [&](const auto& vec) {
+            test::vector_one<int>{}, 350, [&](const auto& vec) {
                 auto id1          = immer_archive::rbts::node_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
                     // Loads correctly
-                    auto loader =
-                        immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+                    auto loader        = example_loader{fix_leaf_nodes(ar)};
                     const auto loaded1 = loader.load_vector(id1);
                     REQUIRE(loaded1 == vec);
                 }
@@ -354,15 +353,14 @@ TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
     SECTION("one vector per archive")
     {
         for_each_generated_length_flex(
-            immer_archive::flex_vector_one<int>{}, 350, [&](const auto& vec) {
-                auto ar           = immer_archive::rbts::archive_save<int>{};
+            test::flex_vector_one<int>{}, 350, [&](const auto& vec) {
+                auto ar           = example_archive_save{};
                 auto id1          = immer_archive::rbts::node_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
                     // Loads correctly
-                    auto loader =
-                        immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+                    auto loader        = example_loader{fix_leaf_nodes(ar)};
                     const auto loaded1 = loader.load_flex_vector(id1);
                     REQUIRE(loaded1 == vec);
                 }
@@ -371,16 +369,15 @@ TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
 
     SECTION("one archive for all")
     {
-        auto ar = immer_archive::rbts::archive_save<int>{};
+        auto ar = example_archive_save{};
         for_each_generated_length_flex(
-            immer_archive::flex_vector_one<int>{}, 350, [&](const auto& vec) {
+            test::flex_vector_one<int>{}, 350, [&](const auto& vec) {
                 auto id1          = immer_archive::rbts::node_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
                     // Loads correctly
-                    auto loader =
-                        immer_archive::rbts::loader<int>{fix_leaf_nodes(ar)};
+                    auto loader        = example_loader{fix_leaf_nodes(ar)};
                     const auto loaded1 = loader.load_flex_vector(id1);
                     REQUIRE(loaded1 == vec);
                 }
@@ -784,9 +781,8 @@ class show_type;
 
 template <class T>
 using node_for = typename decltype([] {
-    using rbtree_t =
-        std::decay_t<decltype(immer_archive::vector_one<T>{}.impl())>;
-    using node_t = typename rbtree_t::node_t;
+    using rbtree_t = std::decay_t<decltype(test::vector_one<T>{}.impl())>;
+    using node_t   = typename rbtree_t::node_t;
     return boost::hana::type_c<node_t>;
 }())::type;
 } // namespace
@@ -810,17 +806,18 @@ TEST_CASE("Test vector with very big objects")
     // show_type<boost::hana::size_t<int_node_t::max_sizeof_leaf>> show;
     static_assert(int_node_t::max_sizeof_leaf == 24);
 
-    const auto small_vec = gen(immer_archive::vector_one<big_object>{}, 67);
+    const auto small_vec = gen(test::vector_one<big_object>{}, 67);
 
-    auto ar           = immer_archive::rbts::archive_save<big_object>{};
+    auto ar = immer_archive::rbts::make_save_archive_for(
+        test::vector_one<big_object>{});
     auto id1          = immer_archive::rbts::node_id{};
     std::tie(ar, id1) = save_to_archive(small_vec, ar);
 
     {
         // Loads correctly
-        auto loader =
-            immer_archive::rbts::loader<big_object>{fix_leaf_nodes(ar)};
-        const auto loaded1 = loader.load_vector(id1);
+        auto loader = immer_archive::rbts::make_loader_for(
+            test::vector_one<big_object>{}, fix_leaf_nodes(ar));
+        const auto loaded1 = loader.load(id1);
         REQUIRE(loaded1 == small_vec);
     }
 
@@ -876,7 +873,7 @@ TEST_CASE("Test modifying vector nodes")
 
     SECTION("Loads correctly")
     {
-        const auto vec = immer_archive::vector_one<int>{0, 1, 2, 3, 4, 5, 6};
+        const auto vec = test::vector_one<int>{0, 1, 2, 3, 4, 5, 6};
         REQUIRE(load_vec(data.dump(), 0) == vec);
     }
 
@@ -896,9 +893,8 @@ TEST_CASE("Test modifying vector nodes")
         REQUIRE(item["key"] == 1);
         SECTION("Add to the tail")
         {
-            item["value"] = {6, 7};
-            const auto vec =
-                immer_archive::vector_one<int>{0, 1, 2, 3, 4, 5, 6, 7};
+            item["value"]  = {6, 7};
+            const auto vec = test::vector_one<int>{0, 1, 2, 3, 4, 5, 6, 7};
             REQUIRE(load_vec(data.dump(), 0) == vec);
         }
         SECTION("Remove from the tail")
@@ -929,7 +925,7 @@ TEST_CASE("Test modifying vector nodes")
         SECTION("Remove one")
         {
             item["value"]["children"] = {2, 4};
-            const auto vec = immer_archive::vector_one<int>{0, 1, 4, 5, 6};
+            const auto vec            = test::vector_one<int>{0, 1, 4, 5, 6};
             REQUIRE(load_vec(data.dump(), 0) == vec);
         }
         SECTION("Unknown child")
@@ -993,9 +989,8 @@ TEST_CASE("Test modifying flex vector nodes")
 
     SECTION("Loads correctly")
     {
-        const auto small_vec = gen(immer_archive::flex_vector_one<int>{}, 7);
-        const auto vec =
-            small_vec + small_vec + immer_archive::flex_vector_one<int>{99};
+        const auto small_vec = gen(test::flex_vector_one<int>{}, 7);
+        const auto vec = small_vec + small_vec + test::flex_vector_one<int>{99};
         REQUIRE(load_flex_vec(data.dump(), 0) == vec);
     }
     SECTION("Modify starting leaf")
@@ -1004,24 +999,22 @@ TEST_CASE("Test modifying flex vector nodes")
         REQUIRE(item["key"] == 2);
         SECTION("One element")
         {
-            item["value"] = {0};
-            const auto vec_234 =
-                immer_archive::flex_vector_one<int>{0, 2, 3, 4, 5};
-            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
-            const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
-            const auto vec    = vec_234 + leaf_5 + vec_234 + leaf_1;
+            item["value"]      = {0};
+            const auto vec_234 = test::flex_vector_one<int>{0, 2, 3, 4, 5};
+            const auto leaf_1  = test::flex_vector_one<int>{6, 99};
+            const auto leaf_5  = test::flex_vector_one<int>{6};
+            const auto vec     = vec_234 + leaf_5 + vec_234 + leaf_1;
             REQUIRE(load_flex_vec(data.dump(), 0) == vec);
         }
 
         // Empty starting leaf triggers a separate branch in the code, actually.
         SECTION("Empty leaf")
         {
-            item["value"] = json_t::array();
-            const auto vec_234 =
-                immer_archive::flex_vector_one<int>{2, 3, 4, 5};
-            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
-            const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
-            const auto vec    = vec_234 + leaf_5 + vec_234 + leaf_1;
+            item["value"]      = json_t::array();
+            const auto vec_234 = test::flex_vector_one<int>{2, 3, 4, 5};
+            const auto leaf_1  = test::flex_vector_one<int>{6, 99};
+            const auto leaf_5  = test::flex_vector_one<int>{6};
+            const auto vec     = vec_234 + leaf_5 + vec_234 + leaf_1;
             REQUIRE(load_flex_vec(data.dump(), 0) == vec);
         }
     }
@@ -1031,22 +1024,20 @@ TEST_CASE("Test modifying flex vector nodes")
         REQUIRE(item["key"] == 3);
         SECTION("One element")
         {
-            item["value"] = {2};
-            const auto vec_234 =
-                immer_archive::flex_vector_one<int>{0, 1, 2, 4, 5};
-            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
-            const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
-            const auto vec    = vec_234 + leaf_5 + vec_234 + leaf_1;
+            item["value"]      = {2};
+            const auto vec_234 = test::flex_vector_one<int>{0, 1, 2, 4, 5};
+            const auto leaf_1  = test::flex_vector_one<int>{6, 99};
+            const auto leaf_5  = test::flex_vector_one<int>{6};
+            const auto vec     = vec_234 + leaf_5 + vec_234 + leaf_1;
             REQUIRE(load_flex_vec(data.dump(), 0) == vec);
         }
         SECTION("Empty leaf")
         {
-            item["value"] = json_t::array();
-            const auto vec_234 =
-                immer_archive::flex_vector_one<int>{0, 1, 4, 5};
-            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
-            const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
-            const auto vec    = vec_234 + leaf_5 + vec_234 + leaf_1;
+            item["value"]      = json_t::array();
+            const auto vec_234 = test::flex_vector_one<int>{0, 1, 4, 5};
+            const auto leaf_1  = test::flex_vector_one<int>{6, 99};
+            const auto leaf_5  = test::flex_vector_one<int>{6};
+            const auto vec     = vec_234 + leaf_5 + vec_234 + leaf_1;
             REQUIRE(load_flex_vec(data.dump(), 0) == vec);
         }
     }
@@ -1061,7 +1052,7 @@ TEST_CASE("Test modifying flex vector nodes")
             // assert, while non-relaxed worked fine.
             const auto is_relaxed    = GENERATE(false, true);
             item["value"]["relaxed"] = is_relaxed;
-            const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
+            const auto leaf_1        = test::flex_vector_one<int>{6, 99};
             REQUIRE(load_flex_vec(data.dump(), 0) == leaf_1);
         }
         SECTION("Too many children")
@@ -1079,9 +1070,9 @@ TEST_CASE("Test modifying flex vector nodes")
                 item["value"]["children"] = {2, 3, 4, 2, 3, 4};
                 const auto is_relaxed     = GENERATE(false, true);
                 item["value"]["relaxed"]  = is_relaxed;
-                const auto leaf_1 = immer_archive::flex_vector_one<int>{6, 99};
+                const auto leaf_1         = test::flex_vector_one<int>{6, 99};
                 const auto vec_234 =
-                    immer_archive::flex_vector_one<int>{0, 1, 2, 3, 4, 5};
+                    test::flex_vector_one<int>{0, 1, 2, 3, 4, 5};
                 const auto vec = vec_234 + vec_234 + leaf_1;
                 REQUIRE(load_flex_vec(data.dump(), 0) == vec);
             }
@@ -1097,13 +1088,10 @@ TEST_CASE("Test modifying flex vector nodes")
                 }
                 SECTION("Relaxed works")
                 {
-                    const auto leaf_1 =
-                        immer_archive::flex_vector_one<int>{6, 99};
-                    const auto leaf_2 =
-                        immer_archive::flex_vector_one<int>{0, 1};
-                    const auto leaf_3 =
-                        immer_archive::flex_vector_one<int>{2, 3};
-                    const auto leaf_5 = immer_archive::flex_vector_one<int>{6};
+                    const auto leaf_1 = test::flex_vector_one<int>{6, 99};
+                    const auto leaf_2 = test::flex_vector_one<int>{0, 1};
+                    const auto leaf_3 = test::flex_vector_one<int>{2, 3};
+                    const auto leaf_5 = test::flex_vector_one<int>{6};
 
                     const auto vec = leaf_2 + leaf_3 + leaf_5 + leaf_3 + leaf_1;
                     REQUIRE(load_flex_vec(data.dump(), 0) == vec);
@@ -1268,6 +1256,6 @@ TEST_CASE("Test more inner nodes")
 //             }
 //         })"};
 
-//     const auto vec = immer_archive::vector_one<int>{0, 1, 2, 3, 4, 5, 6};
+//     const auto vec = test::vector_one<int>{0, 1, 2, 3, 4, 5, 6};
 //     REQUIRE(load_vec(json, 0).value() == vec);
 // }

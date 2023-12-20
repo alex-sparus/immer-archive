@@ -23,11 +23,13 @@ namespace hana = boost::hana;
  * serialized in a special way.
  */
 
+using test::flex_vector_one;
 using test::test_value;
+using test::vector_one;
 
 struct meta_meta
 {
-    immer_archive::archivable<immer_archive::vector_one<int>> ints;
+    immer_archive::archivable<vector_one<int>> ints;
     immer_archive::archivable<immer::table<test_value>> table;
 
     auto tie() const { return std::tie(ints, table); }
@@ -46,8 +48,8 @@ struct meta_meta
 
 struct meta
 {
-    immer_archive::archivable<immer_archive::vector_one<int>> ints;
-    immer_archive::archivable<immer_archive::vector_one<meta_meta>> metas;
+    immer_archive::archivable<vector_one<int>> ints;
+    immer_archive::archivable<vector_one<meta_meta>> metas;
 
     auto tie() const { return std::tie(ints, metas); }
 
@@ -65,13 +67,13 @@ struct meta
 
 struct test_data
 {
-    immer_archive::archivable<immer_archive::vector_one<int>> ints;
-    immer_archive::archivable<immer_archive::vector_one<std::string>> strings;
+    immer_archive::archivable<vector_one<int>> ints;
+    immer_archive::archivable<vector_one<std::string>> strings;
 
-    immer_archive::archivable<immer_archive::flex_vector_one<int>> flex_ints;
+    immer_archive::archivable<flex_vector_one<int>> flex_ints;
     immer_archive::archivable<immer::map<int, std::string>> map;
 
-    immer_archive::archivable<immer_archive::vector_one<meta>> metas;
+    immer_archive::archivable<vector_one<meta>> metas;
 
     // Also test having meta directly, not inside an archivable type
     meta single_meta;
@@ -108,17 +110,17 @@ struct test_data
 inline auto get_archives_types(const test_data&)
 {
     auto names = hana::make_map(
-        hana::make_pair(hana::type_c<immer_archive::vector_one<int>>,
+        hana::make_pair(hana::type_c<vector_one<int>>,
                         BOOST_HANA_STRING("ints")),
-        hana::make_pair(hana::type_c<immer_archive::vector_one<std::string>>,
+        hana::make_pair(hana::type_c<vector_one<std::string>>,
                         BOOST_HANA_STRING("strings")),
-        hana::make_pair(hana::type_c<immer_archive::flex_vector_one<int>>,
+        hana::make_pair(hana::type_c<flex_vector_one<int>>,
                         BOOST_HANA_STRING("flex_ints")),
         hana::make_pair(hana::type_c<immer::map<int, std::string>>,
                         BOOST_HANA_STRING("int_string_map")),
-        hana::make_pair(hana::type_c<immer_archive::vector_one<meta>>,
+        hana::make_pair(hana::type_c<vector_one<meta>>,
                         BOOST_HANA_STRING("metas")),
-        hana::make_pair(hana::type_c<immer_archive::vector_one<meta_meta>>,
+        hana::make_pair(hana::type_c<vector_one<meta_meta>>,
                         BOOST_HANA_STRING("meta_metas")),
         hana::make_pair(hana::type_c<immer::table<test_value>>,
                         BOOST_HANA_STRING("table_test_value"))
@@ -177,7 +179,7 @@ struct StringMaker<meta_meta>
 
 TEST_CASE("Special archive minimal test")
 {
-    const auto ints1 = immer_archive::vector_one<int>{
+    const auto ints1 = vector_one<int>{
         1,
         2,
         3,
@@ -220,13 +222,13 @@ TEST_CASE("Save with a special archive")
     const auto test1 = test_data{
         .ints      = ints1,
         .strings   = {"one", "two"},
-        .flex_ints = immer_archive::flex_vector_one<int>{ints1},
+        .flex_ints = flex_vector_one<int>{ints1},
         .map =
             {
                 {1, "_one_"},
                 {2, "two__"},
             },
-        .metas = {immer_archive::vector_one<meta>{
+        .metas = {vector_one<meta>{
             meta{
                 .ints =
                     {
@@ -283,8 +285,7 @@ TEST_CASE("Save with a special archive")
 
             return archives;
         }();
-        REQUIRE(archives_loaded
-                    .storage[hana::type_c<immer_archive::vector_one<int>>]
+        REQUIRE(archives_loaded.storage[hana::type_c<vector_one<int>>]
                     .archive.leaves.size() == 7);
     }
 
@@ -305,14 +306,14 @@ TEST_CASE("Save with a special archive, special type is enclosed")
         {2, "two__"},
     };
     const auto ints1 = test::gen(test::example_vector{}, 3);
-    const auto ints5 = immer_archive::vector_one<int>{
+    const auto ints5 = vector_one<int>{
         1,
         2,
         3,
         4,
         5,
     };
-    const auto metas = immer_archive::vector_one<meta>{
+    const auto metas = vector_one<meta>{
         meta{
             .ints = ints5,
         },
@@ -323,14 +324,14 @@ TEST_CASE("Save with a special archive, special type is enclosed")
     const auto test1 = test_data{
         .ints      = ints1,
         .strings   = {"one", "two"},
-        .flex_ints = immer_archive::flex_vector_one<int>{ints1},
+        .flex_ints = flex_vector_one<int>{ints1},
         .map       = map,
         .metas     = metas,
     };
     const auto test2 = test_data{
         .ints      = ints1,
         .strings   = {"three"},
-        .flex_ints = immer_archive::flex_vector_one<int>{ints1},
+        .flex_ints = flex_vector_one<int>{ints1},
         .map       = map.set(3, "__three"),
         .metas =
             {

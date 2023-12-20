@@ -8,10 +8,13 @@ namespace immer_archive::rbts {
 
 namespace detail {
 
-template <typename T, typename MemoryPolicy, immer::detail::rbts::bits_t B>
-std::pair<archive_save<T>, node_id>
-get_node_id(archive_save<T> ar,
-            const immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
+template <typename T,
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
+std::pair<archive_save<T, MemoryPolicy, B, BL>, node_id>
+get_node_id(archive_save<T, MemoryPolicy, B, BL> ar,
+            const immer::detail::rbts::node<T, MemoryPolicy, B, BL>* ptr)
 {
     auto* ptr_void = static_cast<const void*>(ptr);
     if (auto* maybe_id = ar.node_ptr_to_id.find(ptr_void)) {
@@ -24,10 +27,13 @@ get_node_id(archive_save<T> ar,
     return {std::move(ar), id};
 }
 
-template <class T>
+template <typename T,
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
 struct archive_builder
 {
-    archive_save<T> ar;
+    archive_save<T, MemoryPolicy, B, BL> ar;
 
     template <class Pos>
     void operator()(regular_pos_tag, Pos& pos, auto&& visit)
@@ -99,8 +105,7 @@ struct archive_builder
         ar.leaves = std::move(ar.leaves).set(id, std::move(info));
     }
 
-    template <typename MemoryPolicy, immer::detail::rbts::bits_t B>
-    node_id get_node_id(immer::detail::rbts::node<T, MemoryPolicy, B, 1>* ptr)
+    node_id get_node_id(immer::detail::rbts::node<T, MemoryPolicy, B, BL>* ptr)
     {
         auto [ar2, id] =
             immer_archive::rbts::detail::get_node_id(std::move(ar), ptr);
@@ -112,47 +117,43 @@ struct archive_builder
 template <typename T,
           typename MemoryPolicy,
           immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL,
           class Archive>
-auto save_nodes(const immer::detail::rbts::rbtree<T, MemoryPolicy, B, 1>& tree,
+auto save_nodes(const immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>& tree,
                 Archive ar)
 {
-    using tree_t = std::decay_t<decltype(tree)>;
-    using node_t = typename tree_t::node_t;
-
-    auto save = archive_builder<typename node_t::value_t>{
+    auto save = archive_builder<T, MemoryPolicy, B, BL>{
         .ar = std::move(ar),
     };
-
     tree.traverse(visitor_helper{}, save);
-
     return std::move(save.ar);
 }
 
 template <typename T,
           typename MemoryPolicy,
           immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL,
           class Archive>
-auto save_nodes(const immer::detail::rbts::rrbtree<T, MemoryPolicy, B, 1>& tree,
-                Archive ar)
+auto save_nodes(
+    const immer::detail::rbts::rrbtree<T, MemoryPolicy, B, BL>& tree,
+    Archive ar)
 {
-    using tree_t = std::decay_t<decltype(tree)>;
-    using node_t = typename tree_t::node_t;
-
-    auto save = archive_builder<typename node_t::value_t>{
+    auto save = archive_builder<T, MemoryPolicy, B, BL>{
         .ar = std::move(ar),
     };
-
     tree.traverse(visitor_helper{}, save);
-
-    auto result = std::move(save.ar);
-    return result;
+    return std::move(save.ar);
 }
 
 } // namespace detail
 
-template <class T>
-std::pair<archive_save<T>, node_id> save_to_archive(vector_one<T> vec,
-                                                    archive_save<T> archive)
+template <typename T,
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
+std::pair<archive_save<T, MemoryPolicy, B, BL>, node_id>
+save_to_archive(immer::vector<T, MemoryPolicy, B, BL> vec,
+                archive_save<T, MemoryPolicy, B, BL> archive)
 {
     const auto& impl = vec.impl();
     auto root_id     = node_id{};
@@ -183,7 +184,7 @@ std::pair<archive_save<T>, node_id> save_to_archive(vector_one<T> vec,
     archive.rbts_to_id = std::move(archive.rbts_to_id).set(tree_id, vector_id);
     archive.vectors    = std::move(archive.vectors)
                           .set(vector_id,
-                               vector_save<T>{
+                               vector_save<T, MemoryPolicy, B, BL>{
                                    .rbts =
                                        rbts_info{
                                            .root  = root_id,
@@ -196,9 +197,13 @@ std::pair<archive_save<T>, node_id> save_to_archive(vector_one<T> vec,
     return {std::move(archive), vector_id};
 }
 
-template <class T>
-std::pair<archive_save<T>, node_id> save_to_archive(flex_vector_one<T> vec,
-                                                    archive_save<T> archive)
+template <typename T,
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
+std::pair<archive_save<T, MemoryPolicy, B, BL>, node_id>
+save_to_archive(immer::flex_vector<T, MemoryPolicy, B, BL> vec,
+                archive_save<T, MemoryPolicy, B, BL> archive)
 {
     const auto& impl = vec.impl();
     auto root_id     = node_id{};
@@ -229,7 +234,7 @@ std::pair<archive_save<T>, node_id> save_to_archive(flex_vector_one<T> vec,
     archive.rbts_to_id = std::move(archive.rbts_to_id).set(tree_id, vector_id);
     archive.flex_vectors = std::move(archive.flex_vectors)
                                .set(vector_id,
-                                    flex_vector_save<T>{
+                                    flex_vector_save<T, MemoryPolicy, B, BL>{
                                         .rbts =
                                             rbts_info{
                                                 .root  = root_id,

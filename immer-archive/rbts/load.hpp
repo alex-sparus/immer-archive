@@ -110,12 +110,12 @@ public:
 };
 
 template <class T,
-          typename MemoryPolicy         = immer::default_memory_policy,
-          immer::detail::rbts::bits_t B = immer::default_bits>
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
 class loader
 {
 public:
-    static constexpr auto BL = immer::detail::rbts::bits_t{1};
     using rbtree         = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
     using rrbtree        = immer::detail::rbts::rrbtree<T, MemoryPolicy, B, BL>;
     using node_t         = typename rbtree::node_t;
@@ -128,7 +128,7 @@ public:
     {
     }
 
-    vector_one<T, MemoryPolicy, B> load_vector(node_id id)
+    immer::vector<T, MemoryPolicy, B, BL> load_vector(node_id id)
     {
         auto* info = ar_.vectors.find(id);
         if (!info) {
@@ -147,10 +147,10 @@ public:
                            std::move(tail).release()};
 
         verify_tree(impl);
-        return vector_one<T, MemoryPolicy, B>{std::move(impl)};
+        return impl;
     }
 
-    flex_vector_one<T, MemoryPolicy, B> load_flex_vector(node_id id)
+    immer::flex_vector<T, MemoryPolicy, B, BL> load_flex_vector(node_id id)
     {
         auto* info = ar_.flex_vectors.find(id);
         if (!info) {
@@ -170,7 +170,7 @@ public:
 
         verify_tree(impl);
 
-        return flex_vector_one<T, MemoryPolicy, B>{std::move(impl)};
+        return impl;
     }
 
 private:
@@ -396,9 +396,10 @@ private:
     immer::map<node_id, std::size_t> sizes_;
 };
 
-template <class T,
-          typename MemoryPolicy         = immer::default_memory_policy,
-          immer::detail::rbts::bits_t B = immer::default_bits>
+template <typename T,
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
 class vector_loader
 {
 public:
@@ -410,12 +411,24 @@ public:
     auto load(node_id id) { return loader.load_vector(id); }
 
 private:
-    loader<T, MemoryPolicy, B> loader;
+    loader<T, MemoryPolicy, B, BL> loader;
 };
 
-template <class T,
-          typename MemoryPolicy         = immer::default_memory_policy,
-          immer::detail::rbts::bits_t B = immer::default_bits>
+template <typename T,
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
+vector_loader<T, MemoryPolicy, B, BL>
+make_loader_for(const immer::vector<T, MemoryPolicy, B, BL>&,
+                archive_load<T> ar)
+{
+    return vector_loader<T, MemoryPolicy, B, BL>{std::move(ar)};
+}
+
+template <typename T,
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
 class flex_vector_loader
 {
 public:
@@ -427,7 +440,18 @@ public:
     auto load(node_id id) { return loader.load_flex_vector(id); }
 
 private:
-    loader<T, MemoryPolicy, B> loader;
+    loader<T, MemoryPolicy, B, BL> loader;
 };
+
+template <typename T,
+          typename MemoryPolicy,
+          immer::detail::rbts::bits_t B,
+          immer::detail::rbts::bits_t BL>
+flex_vector_loader<T, MemoryPolicy, B, BL>
+make_loader_for(const immer::flex_vector<T, MemoryPolicy, B, BL>&,
+                archive_load<T> ar)
+{
+    return flex_vector_loader<T, MemoryPolicy, B, BL>{std::move(ar)};
+}
 
 } // namespace immer_archive::rbts
