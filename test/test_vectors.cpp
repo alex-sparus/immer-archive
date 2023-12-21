@@ -1246,11 +1246,11 @@ TEST_CASE("Test flex vector with a weird shape")
         {{"key", 0}, {"value", {{"children", {35}}, {"relaxed", false}}}},
         {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", false}}}},
     };
-    data["value0"]["vectors"] = {
+    data["value0"]["flex_vectors"] = {
         {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}, {"shift", 6}}}}};
-    data["value0"]["flex_vectors"] = json_t::array();
+    data["value0"]["vectors"] = json_t::array();
 
-    const auto loaded = load_vec(data.dump(), 0);
+    const auto loaded = load_flex_vec(data.dump(), 0);
     // {
     //     auto ar        = immer_archive::rbts::make_save_archive_for(loaded);
     //     auto vector_id = immer_archive::rbts::node_id{};
@@ -1260,39 +1260,10 @@ TEST_CASE("Test flex vector with a weird shape")
     // }
 
     const auto expected = example_vector{64, 65, 66};
-    const auto rebuilt  = example_vector{loaded.begin(), loaded.end()};
-    // We can rebuild the loaded vector (i.e. iterate over it) and it works.
-    REQUIRE(rebuilt == expected);
-
-    // But trying to compare it directly, leads to a crash.
-    // Assertion failed: (kind() == kind_t::inner), function inner, file
-    // /nix/store/62187qfwlanv0wyrmchvnyz635d1nbxl-immer-v0.0/include/immer/detail/rbts/node.hpp,
-    // line 175.
-    FAIL("Comment this line to reproduce the crash");
     REQUIRE(loaded == expected);
+
+    const auto rebuilt = example_vector{loaded.begin(), loaded.end()};
+    // We can rebuild the loaded vector (i.e. iterate over it) and it also
+    // works.
+    REQUIRE(rebuilt == expected);
 }
-
-// TEST_CASE("Test corrupted shift")
-// {
-//     const auto json = std::string{R"({
-//             "value0": {
-//                 "leaves": [
-//                     { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1
-//                     ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4,
-//                     "value": [ 4, 5 ] }
-//                 ],
-//                 "inners": [
-//                     { "key": 0, "value": { "children": [ 2, 3, 4 ] } }
-//                 ],
-//                 "relaxed_inners": [],
-//                 "vectors": [
-//                     { "key": 0, "value": { "root": 0, "tail": 1,
-//                     "shift": 0 } }
-//                 ],
-//                 "flex_vectors": []
-//             }
-//         })"};
-
-//     const auto vec = test::vector_one<int>{0, 1, 2, 3, 4, 5, 6};
-//     REQUIRE(load_vec(json, 0).value() == vec);
-// }
