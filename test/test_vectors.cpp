@@ -1235,6 +1235,37 @@ TEST_CASE("Test more inner nodes")
     }
 }
 
+TEST_CASE("Test flex vector with a weird shape")
+{
+    json_t data;
+    data["value0"]["leaves"] = {
+        {{"key", 1}, {"value", {66}}},
+        {{"key", 36}, {"value", {64, 65}}},
+    };
+    data["value0"]["inners"] = {
+        {{"key", 0}, {"value", {{"children", {35}}, {"relaxed", false}}}},
+        {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", false}}}},
+    };
+    data["value0"]["vectors"] = {
+        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}, {"shift", 6}}}}};
+    data["value0"]["flex_vectors"] = json_t::array();
+
+    const auto loaded = load_vec(data.dump(), 0);
+    {
+        auto ar        = immer_archive::rbts::make_save_archive_for(loaded);
+        auto vector_id = immer_archive::rbts::node_id{};
+        std::tie(ar, vector_id) =
+            immer_archive::rbts::save_to_archive(loaded, ar);
+        SPDLOG_INFO("{}", test::to_json(ar));
+    }
+
+    for (auto i : loaded) {
+        SPDLOG_INFO(i);
+    }
+    FAIL("Comment this line to reproduce the crash");
+    REQUIRE(loaded == example_vector{64, 65, 66});
+}
+
 // TEST_CASE("Test corrupted shift")
 // {
 //     const auto json = std::string{R"({
