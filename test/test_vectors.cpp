@@ -1251,19 +1251,25 @@ TEST_CASE("Test flex vector with a weird shape")
     data["value0"]["flex_vectors"] = json_t::array();
 
     const auto loaded = load_vec(data.dump(), 0);
-    {
-        auto ar        = immer_archive::rbts::make_save_archive_for(loaded);
-        auto vector_id = immer_archive::rbts::node_id{};
-        std::tie(ar, vector_id) =
-            immer_archive::rbts::save_to_archive(loaded, ar);
-        SPDLOG_INFO("{}", test::to_json(ar));
-    }
+    // {
+    //     auto ar        = immer_archive::rbts::make_save_archive_for(loaded);
+    //     auto vector_id = immer_archive::rbts::node_id{};
+    //     std::tie(ar, vector_id) =
+    //         immer_archive::rbts::save_to_archive(loaded, ar);
+    //     SPDLOG_INFO("{}", test::to_json(ar));
+    // }
 
-    for (auto i : loaded) {
-        SPDLOG_INFO(i);
-    }
+    const auto expected = example_vector{64, 65, 66};
+    const auto rebuilt  = example_vector{loaded.begin(), loaded.end()};
+    // We can rebuild the loaded vector (i.e. iterate over it) and it works.
+    REQUIRE(rebuilt == expected);
+
+    // But trying to compare it directly, leads to a crash.
+    // Assertion failed: (kind() == kind_t::inner), function inner, file
+    // /nix/store/62187qfwlanv0wyrmchvnyz635d1nbxl-immer-v0.0/include/immer/detail/rbts/node.hpp,
+    // line 175.
     FAIL("Comment this line to reproduce the crash");
-    REQUIRE(loaded == example_vector{64, 65, 66});
+    REQUIRE(loaded == expected);
 }
 
 // TEST_CASE("Test corrupted shift")
