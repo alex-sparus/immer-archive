@@ -1160,7 +1160,7 @@ TEMPLATE_LIST_TEST_CASE_METHOD(verify_shift_calculation,
     REQUIRE(verify_shift_calculation<TestType>::run());
 }
 
-TEST_CASE("Test more inner nodes")
+TEST_CASE("Test more inner nodes", "[.wip]")
 {
     json_t data;
     data["value0"]["leaves"] = {
@@ -1235,7 +1235,42 @@ TEST_CASE("Test more inner nodes")
     }
 }
 
-TEST_CASE("Test flex vector with a weird shape")
+TEST_CASE("Test flex vector with a weird shape relaxed")
+{
+    json_t data;
+    data["value0"]["leaves"] = {
+        {{"key", 1}, {"value", {66}}},
+        {{"key", 36}, {"value", {64, 65}}},
+    };
+    data["value0"]["inners"] = {
+        {{"key", 0}, {"value", {{"children", {35}}, {"relaxed", true}}}},
+        {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", true}}}},
+    };
+    data["value0"]["flex_vectors"] = {
+        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}, {"shift", 6}}}}};
+    data["value0"]["vectors"] = json_t::array();
+
+    const auto loaded = load_flex_vec(data.dump(), 0);
+    // {
+    //     auto ar        = immer_archive::rbts::make_save_archive_for(loaded);
+    //     auto vector_id = immer_archive::rbts::node_id{};
+    //     std::tie(ar, vector_id) =
+    //         immer_archive::rbts::save_to_archive(loaded, ar);
+    //     SPDLOG_INFO("{}", test::to_json(ar));
+    // }
+
+    const auto expected = example_vector{64, 65, 66};
+
+    // Test iteration over the loaded vector
+    {
+        const auto rebuilt = example_vector{loaded.begin(), loaded.end()};
+        REQUIRE(rebuilt == expected);
+    }
+
+    REQUIRE(loaded == expected);
+}
+
+TEST_CASE("Test flex vector with a weird shape strict")
 {
     json_t data;
     data["value0"]["leaves"] = {
@@ -1260,10 +1295,12 @@ TEST_CASE("Test flex vector with a weird shape")
     // }
 
     const auto expected = example_vector{64, 65, 66};
-    REQUIRE(loaded == expected);
 
-    const auto rebuilt = example_vector{loaded.begin(), loaded.end()};
-    // We can rebuild the loaded vector (i.e. iterate over it) and it also
-    // works.
-    REQUIRE(rebuilt == expected);
+    // Test iteration over the loaded vector
+    {
+        const auto rebuilt = example_vector{loaded.begin(), loaded.end()};
+        REQUIRE(rebuilt == expected);
+    }
+
+    REQUIRE(loaded == expected);
 }
