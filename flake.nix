@@ -56,22 +56,26 @@
         };
     in rec {
       devShell = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
-        packages = with pkgs; [
-          clang-format
-          cmake-format
-          cmake
-          ninja
-          spdlog
-          arximboldi-cereal
-          fmt_9
-          catch2_3
-          boost
-          nlohmann_json
-          immer.defaultPackage.${system}
+        packages = with pkgs;
+          [
+            clang-format
+            cmake-format
+            cmake
+            ninja
+            spdlog
+            arximboldi-cereal
+            fmt_9
+            catch2_3
+            boost
+            nlohmann_json
+            immer.defaultPackage.${system}
 
-          # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
-          our_llvm.bintools-unwrapped
-        ];
+            # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
+            our_llvm.bintools-unwrapped
+          ]
+          ++ lib.optionals stdenv.isLinux [
+            valgrind
+          ];
       };
 
       arximboldi-cereal = pkgs.callPackage cereal-derivation {};
