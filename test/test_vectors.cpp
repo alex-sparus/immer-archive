@@ -385,66 +385,6 @@ TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
     }
 }
 
-TEST_CASE("Invalid root id")
-{
-    const auto json = std::string{R"({
-            "value0": {
-                "leaves": [
-                    { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1 ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4, "value": [ 4, 5 ] }
-                ],
-                "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 4 ], "relaxed": false } }
-                ],
-                "vectors": [
-                    { "key": 0, "value": { "root": 1, "tail": 1, "shift": 1 } }
-                ],
-                "flex_vectors": []
-            }
-        })"};
-    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::invalid_node_id);
-}
-
-TEST_CASE("Invalid tail id")
-{
-    const auto json = std::string{R"({
-            "value0": {
-                "leaves": [
-                    { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1 ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4, "value": [ 4, 5 ] }
-                ],
-                "inners": [
-                    { "key": 0, "value": { "children": [ 2, 3, 4 ], "relaxed": false } }
-                ],
-                "vectors": [
-                    { "key": 0, "value": { "root": 0, "tail": 999, "shift": 1 } }
-                ],
-                "flex_vectors": []
-            }
-        })"};
-    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::invalid_node_id);
-}
-
-TEST_CASE("Node has itself as a child")
-{
-    const auto json = std::string{R"({
-            "value0": {
-                "leaves": [
-                    { "key": 1, "value": [ 6 ] }, { "key": 2, "value": [ 0, 1
-                    ] }, { "key": 3, "value": [ 2, 3 ] }, { "key": 4,
-                    "value": [ 4, 5 ] }
-                ],
-                "inners": [
-                    { "key": 0, "value": { "children": [ 2, 0, 4 ], "relaxed": false } }
-                ],
-                "vectors": [
-                    { "key": 0, "value": { "root": 0, "tail": 1,
-                    "shift": 1 } }
-                ],
-                "flex_vectors": []
-            }
-        })"};
-    REQUIRE_THROWS_AS(load_vec(json, 0), immer_archive::archive_has_cycles);
-}
-
 TEST_CASE("A loop with 2 nodes")
 {
     const auto json = std::string{R"({
@@ -826,7 +766,6 @@ TEST_CASE("Test vector with very big objects")
 
 TEST_CASE("Test modifying vector nodes")
 {
-    const auto is_relaxed = GENERATE(false, true);
     json_t data;
     data["value0"]["leaves"] = {
         {
@@ -853,7 +792,7 @@ TEST_CASE("Test modifying vector nodes")
                 "value",
                 {
                     {"children", {2, 3, 4}},
-                    {"relaxed", is_relaxed},
+                    {"relaxed", false},
                 },
             },
         },
@@ -865,7 +804,6 @@ TEST_CASE("Test modifying vector nodes")
              {
                  {"root", 0},
                  {"tail", 1},
-                 {"shift", 1},
              }},
         },
     };
@@ -875,6 +813,20 @@ TEST_CASE("Test modifying vector nodes")
     {
         const auto vec = test::vector_one<int>{0, 1, 2, 3, 4, 5, 6};
         REQUIRE(load_vec(data.dump(), 0) == vec);
+    }
+
+    SECTION("Invalid root id")
+    {
+        data["value0"]["vectors"][0]["value"]["root"] = 1;
+        REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
+                          immer_archive::invalid_node_id);
+    }
+
+    SECTION("Invalid tail id")
+    {
+        data["value0"]["vectors"][0]["value"]["tail"] = 999;
+        REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
+                          immer_archive::invalid_node_id);
     }
 
     SECTION("A leaf with too few elements")
@@ -934,6 +886,19 @@ TEST_CASE("Test modifying vector nodes")
             REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
                               immer_archive::invalid_node_id);
         }
+        SECTION("Node has itself as a child")
+        {
+            item["value"]["children"] = {2, 0, 4};
+            REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
+                              immer_archive::archive_has_cycles);
+        }
+        SECTION("Strict vector can not have relaxed nodes")
+        {
+            item["value"]["relaxed"] = true;
+            REQUIRE_THROWS_AS(
+                load_vec(data.dump(), 0),
+                immer_archive::rbts::relaxed_node_not_allowed_exception);
+        }
     }
 }
 
@@ -992,6 +957,14 @@ TEST_CASE("Test modifying flex vector nodes")
         const auto small_vec = gen(test::flex_vector_one<int>{}, 7);
         const auto vec = small_vec + small_vec + test::flex_vector_one<int>{99};
         REQUIRE(load_flex_vec(data.dump(), 0) == vec);
+    }
+    SECTION("Non-relaxed vector can not have relaxed nodes")
+    {
+        data["value0"]["vectors"]      = data["value0"]["flex_vectors"];
+        data["value0"]["flex_vectors"] = json_t::array();
+        REQUIRE_THROWS_AS(
+            load_vec(data.dump(), 0),
+            immer_archive::rbts::relaxed_node_not_allowed_exception);
     }
     SECTION("Modify starting leaf")
     {
@@ -1160,7 +1133,7 @@ TEMPLATE_LIST_TEST_CASE_METHOD(verify_shift_calculation,
     REQUIRE(verify_shift_calculation<TestType>::run());
 }
 
-TEST_CASE("Test more inner nodes", "[.wip]")
+TEST_CASE("Test more inner nodes")
 {
     json_t data;
     data["value0"]["leaves"] = {
@@ -1192,8 +1165,16 @@ TEST_CASE("Test more inner nodes", "[.wip]")
            {"relaxed", false}}}},
         {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", false}}}},
     };
-    data["value0"]["vectors"] = {
-        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}, {"shift", 6}}}}};
+    data["value0"]["vectors"]      = {{
+        {"key", 0},
+        {
+            "value",
+            {
+                {"root", 0},
+                {"tail", 1},
+            },
+        },
+    }};
     data["value0"]["flex_vectors"] = json_t::array();
 
     SECTION("Loads correctly")
@@ -1215,23 +1196,29 @@ TEST_CASE("Test more inner nodes", "[.wip]")
             item["value"]["children"] = {2, 560, 35};
             REQUIRE(load_vec(data.dump(), 0) == gen(example_vector{}, 67));
         }
-        SECTION("Empty first")
-        {
-            FAIL("Fix this test");
-            item["value"]["children"] = {560, 35};
-            REQUIRE_NOTHROW(load_vec(data.dump(), 0));
-            for (auto i : load_vec(data.dump(), 0)) {
-                SPDLOG_INFO(i);
-            }
-            REQUIRE(1 == 2);
-            // REQUIRE(load_vec(data.dump(), 0) == example_vector{64, 65, 66});
-        }
-        SECTION("Empty last")
-        {
-            FAIL("Fix this test");
-            item["value"]["children"] = {35, 560};
-            REQUIRE(load_vec(data.dump(), 0) == example_vector{64, 65, 66});
-        }
+
+        /**
+         * NOTE: These two tests do not work as long as there is a bug in "Test
+         * flex vector with a weird shape strict".
+         */
+        // SECTION("Empty first")
+        // {
+        //     FAIL("Fix this test");
+        //     item["value"]["children"] = {560, 35};
+        //     REQUIRE_NOTHROW(load_vec(data.dump(), 0));
+        //     for (auto i : load_vec(data.dump(), 0)) {
+        //         SPDLOG_INFO(i);
+        //     }
+        //     REQUIRE(1 == 2);
+        //     // REQUIRE(load_vec(data.dump(), 0) == example_vector{64, 65,
+        //     66});
+        // }
+        // SECTION("Empty last")
+        // {
+        //     FAIL("Fix this test");
+        //     item["value"]["children"] = {35, 560};
+        //     REQUIRE(load_vec(data.dump(), 0) == example_vector{64, 65, 66});
+        // }
     }
 }
 
@@ -1270,7 +1257,7 @@ TEST_CASE("Test flex vector with a weird shape relaxed")
     REQUIRE(loaded == expected);
 }
 
-TEST_CASE("Test flex vector with a weird shape strict")
+TEST_CASE("Test flex vector with a weird shape strict", "[valgrind]")
 {
     json_t data;
     data["value0"]["leaves"] = {

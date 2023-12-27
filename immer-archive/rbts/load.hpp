@@ -109,6 +109,19 @@ public:
     std::size_t real_count;
 };
 
+class relaxed_node_not_allowed_exception : public archive_exception
+{
+public:
+    relaxed_node_not_allowed_exception(node_id id_)
+        : archive_exception{fmt::format(
+              "Non-relaxed vector can not have relaxed node ID {}", id_)}
+        , id{id_}
+    {
+    }
+
+    node_id id;
+};
+
 template <class T,
           typename MemoryPolicy,
           immer::detail::rbts::bits_t B,
@@ -135,7 +148,8 @@ public:
             throw archive_exception{fmt::format("Unknown vector ID {}", id)};
         }
 
-        auto root = load_inner(info->rbts.root, {});
+        const auto relaxed_allowed = false;
+        auto root = load_inner(info->rbts.root, {}, relaxed_allowed);
         auto tail = load_leaf(info->rbts.tail);
 
         const auto tree_size =
@@ -157,7 +171,8 @@ public:
             throw invalid_node_id{id};
         }
 
-        auto root = load_inner(info->rbts.root, {});
+        const auto relaxed_allowed = true;
+        auto root = load_inner(info->rbts.root, {}, relaxed_allowed);
         auto tail = load_leaf(info->rbts.tail);
 
         const auto tree_size =
@@ -200,7 +215,8 @@ private:
         return leaf;
     }
 
-    node_ptr load_inner(node_id id, nodes_set_t loading_nodes)
+    node_ptr
+    load_inner(node_id id, nodes_set_t loading_nodes, bool relaxed_allowed)
     {
         if (loading_nodes.count(id)) {
             throw archive_has_cycles{id};
@@ -229,6 +245,10 @@ private:
         // Pretend it's a strict node.
         const bool is_relaxed = node_info->relaxed && n > 0;
 
+        if (is_relaxed && !relaxed_allowed) {
+            throw relaxed_node_not_allowed_exception{id};
+        }
+
         auto inner =
             is_relaxed
                 ? node_ptr{node_t::make_inner_r_n(n),
@@ -242,7 +262,8 @@ private:
             auto index                      = std::size_t{};
             auto running_size               = std::size_t{};
             for (const auto& child_node_id : children_ids) {
-                auto child = load_some_node(child_node_id, loading_nodes);
+                auto child = load_some_node(
+                    child_node_id, loading_nodes, relaxed_allowed);
                 running_size += get_node_size(child_node_id);
 
                 auto* raw_ptr = child.get();
@@ -254,7 +275,8 @@ private:
         } else {
             auto index = std::size_t{};
             for (const auto& child_node_id : children_ids) {
-                auto child    = load_some_node(child_node_id, loading_nodes);
+                auto child = load_some_node(
+                    child_node_id, loading_nodes, relaxed_allowed);
                 auto* raw_ptr = child.get();
                 children      = std::move(children).push_back(std::move(child));
                 inner.get()->inner()[index] = raw_ptr;
@@ -271,14 +293,15 @@ private:
         return inner;
     }
 
-    node_ptr load_some_node(node_id id, nodes_set_t loading_nodes)
+    node_ptr
+    load_some_node(node_id id, nodes_set_t loading_nodes, bool relaxed_allowed)
     {
         // Unknown type: leaf, inner or relaxed
         if (ar_.leaves.count(id)) {
             return load_leaf(id);
         }
         if (ar_.inners.count(id)) {
-            return load_inner(id, std::move(loading_nodes));
+            return load_inner(id, std::move(loading_nodes), relaxed_allowed);
         }
         throw invalid_node_id{id};
     }
