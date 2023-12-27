@@ -71,13 +71,16 @@ if(BUILD_TESTS)
     target_compile_definitions(tests
                                PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
   elseif(LINUX)
-    target_compile_options(
-      tests PRIVATE -O1 -fno-optimize-sibling-calls -g -fno-omit-frame-pointer
-                    -fsanitize-coverage=trace-pc-guard -fsanitize=address)
+    target_compile_options(tests PRIVATE -O1 -fno-optimize-sibling-calls -g
+                                         -fno-omit-frame-pointer)
+    if(TESTS_WITH_LEAK_SANITIZER)
+      target_compile_options(tests PRIVATE -fsanitize-coverage=trace-pc-guard
+                                           -fsanitize=address)
+      target_link_options(tests PRIVATE -fsanitize=address)
+    endif()
     target_compile_definitions(tests PRIVATE BOOST_USE_ASAN=1)
     target_compile_definitions(tests
                                PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
-    target_link_options(tests PRIVATE -fsanitize=address)
   else()
     # macOS but not Xcode ninja && ASAN_OPTIONS=detect_leaks=1
     # LSAN_OPTIONS=suppressions=../suppr.txt ./tests
