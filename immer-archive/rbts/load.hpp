@@ -142,7 +142,7 @@ public:
             get_node_size(info->rbts.root) + get_node_size(info->rbts.tail);
 
         auto impl = rbtree{tree_size,
-                           info->rbts.shift,
+                           get_shift_for_size<B, BL>(tree_size),
                            std::move(root).release(),
                            std::move(tail).release()};
 
@@ -327,8 +327,12 @@ private:
     {
         const auto check_inner = [&](auto&& pos, auto&& visit) {
             const auto* id = loaded_inners_.find(pos.node());
-            assert(id);
             if (!id) {
+                if (loaded_leaves_.find(pos.node())) {
+                    throw std::logic_error{"A node is expected to be an inner "
+                                           "node but it's actually a leaf"};
+                }
+
                 throw std::logic_error{"Inner node of a freshly loaded "
                                        "vector is unknown"};
             }

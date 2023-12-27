@@ -51,11 +51,25 @@ struct rbts_info
 {
     node_id root;
     node_id tail;
+
+    auto tie() const { return std::tie(root, tail); }
+
+    friend bool operator==(const rbts_info& left, const rbts_info& right)
+    {
+        return left.tie() == right.tie();
+    }
+};
+
+struct relaxed_rbts_info
+{
+    node_id root;
+    node_id tail;
     immer::detail::rbts::shift_t shift;
 
     auto tie() const { return std::tie(root, tail, shift); }
 
-    friend bool operator==(const rbts_info& left, const rbts_info& right)
+    friend bool operator==(const relaxed_rbts_info& left,
+                           const relaxed_rbts_info& right)
     {
         return left.tie() == right.tie();
     }
@@ -101,14 +115,14 @@ template <typename T,
           immer::detail::rbts::bits_t BL>
 struct flex_vector_save
 {
-    rbts_info rbts;
+    relaxed_rbts_info rbts;
     // Saving the archived vector, so that no mutations are allowed to happen.
     immer::flex_vector<T, MemoryPolicy, B, BL> vector;
 };
 
 struct flex_vector_load
 {
-    rbts_info rbts;
+    relaxed_rbts_info rbts;
 
     friend bool operator==(const flex_vector_load& left,
                            const flex_vector_load& right)
@@ -248,7 +262,7 @@ void serialize(Archive& ar, inner_node& value)
 }
 
 template <class Archive>
-void save(Archive& ar, const rbts_info& value)
+void serialize(Archive& ar, relaxed_rbts_info& value)
 {
     auto& root  = value.root;
     auto& tail  = value.tail;
@@ -257,12 +271,11 @@ void save(Archive& ar, const rbts_info& value)
 }
 
 template <class Archive>
-void load(Archive& ar, rbts_info& value)
+void serialize(Archive& ar, rbts_info& value)
 {
-    auto& root  = value.root;
-    auto& tail  = value.tail;
-    auto& shift = value.shift;
-    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(shift));
+    auto& root = value.root;
+    auto& tail = value.tail;
+    ar(CEREAL_NVP(root), CEREAL_NVP(tail));
 }
 
 template <class Archive>
@@ -280,13 +293,13 @@ template <class Archive,
           immer::detail::rbts::bits_t BL>
 void save(Archive& ar, const vector_save<T, MemoryPolicy, B, BL>& value)
 {
-    save(ar, value.rbts);
+    serialize(ar, const_cast<rbts_info&>(value.rbts));
 }
 
 template <class Archive>
 void load(Archive& ar, vector_load& value)
 {
-    load(ar, value.rbts);
+    serialize(ar, value.rbts);
 }
 
 template <class Archive,
@@ -296,13 +309,13 @@ template <class Archive,
           immer::detail::rbts::bits_t BL>
 void save(Archive& ar, const flex_vector_save<T, MemoryPolicy, B, BL>& value)
 {
-    save(ar, value.rbts);
+    serialize(ar, const_cast<relaxed_rbts_info&>(value.rbts));
 }
 
 template <class Archive>
 void load(Archive& ar, flex_vector_load& value)
 {
-    load(ar, value.rbts);
+    serialize(ar, value.rbts);
 }
 
 template <class Archive,

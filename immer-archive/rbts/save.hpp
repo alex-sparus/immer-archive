@@ -187,9 +187,8 @@ save_to_archive(immer::vector<T, MemoryPolicy, B, BL> vec,
                                vector_save<T, MemoryPolicy, B, BL>{
                                    .rbts =
                                        rbts_info{
-                                           .root  = root_id,
-                                           .tail  = tail_id,
-                                           .shift = impl.shift,
+                                           .root = root_id,
+                                           .tail = tail_id,
                                        },
                                    .vector = std::move(vec),
                                });
@@ -236,7 +235,7 @@ save_to_archive(immer::flex_vector<T, MemoryPolicy, B, BL> vec,
                                .set(vector_id,
                                     flex_vector_save<T, MemoryPolicy, B, BL>{
                                         .rbts =
-                                            rbts_info{
+                                            relaxed_rbts_info{
                                                 .root  = root_id,
                                                 .tail  = tail_id,
                                                 .shift = impl.shift,
