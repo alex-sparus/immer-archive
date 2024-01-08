@@ -60,21 +60,6 @@ struct rbts_info
     }
 };
 
-struct relaxed_rbts_info
-{
-    node_id root;
-    node_id tail;
-    immer::detail::rbts::shift_t shift;
-
-    auto tie() const { return std::tie(root, tail, shift); }
-
-    friend bool operator==(const relaxed_rbts_info& left,
-                           const relaxed_rbts_info& right)
-    {
-        return left.tie() == right.tie();
-    }
-};
-
 struct rbts_id
 {
     node_id root;
@@ -99,36 +84,15 @@ struct vector_save
     immer::vector<T, MemoryPolicy, B, BL> vector;
 };
 
-struct vector_load
-{
-    rbts_info rbts;
-
-    friend bool operator==(const vector_load& left, const vector_load& right)
-    {
-        return left.rbts == right.rbts;
-    }
-};
-
 template <typename T,
           typename MemoryPolicy,
           immer::detail::rbts::bits_t B,
           immer::detail::rbts::bits_t BL>
 struct flex_vector_save
 {
-    relaxed_rbts_info rbts;
+    rbts_info rbts;
     // Saving the archived vector, so that no mutations are allowed to happen.
     immer::flex_vector<T, MemoryPolicy, B, BL> vector;
-};
-
-struct flex_vector_load
-{
-    relaxed_rbts_info rbts;
-
-    friend bool operator==(const flex_vector_load& left,
-                           const flex_vector_load& right)
-    {
-        return left.rbts == right.rbts;
-    }
 };
 
 template <typename T,
@@ -170,8 +134,8 @@ struct archive_load
 {
     immer::map<node_id, leaf_node_load<T>> leaves;
     immer::map<node_id, inner_node> inners;
-    immer::map<node_id, vector_load> vectors;
-    immer::map<node_id, flex_vector_load> flex_vectors;
+    immer::map<node_id, rbts_info> vectors;
+    immer::map<node_id, rbts_info> flex_vectors;
 
     auto tie() const { return std::tie(leaves, inners, vectors, flex_vectors); }
 
@@ -197,21 +161,14 @@ archive_load<T> fix_leaf_nodes(archive_save<T, MemoryPolicy, B, BL> ar)
         leaves = std::move(leaves).set(item.first, leaf);
     }
 
-    auto vectors = immer::map<node_id, vector_load>{};
+    auto vectors = immer::map<node_id, rbts_info>{};
     for (const auto& [id, info] : ar.vectors) {
-        vectors = std::move(vectors).set(id,
-                                         vector_load{
-                                             .rbts = info.rbts,
-                                         });
+        vectors = std::move(vectors).set(id, info.rbts);
     }
 
-    auto flex_vectors = immer::map<node_id, flex_vector_load>{};
+    auto flex_vectors = immer::map<node_id, rbts_info>{};
     for (const auto& [id, info] : ar.flex_vectors) {
-        flex_vectors = std::move(flex_vectors)
-                           .set(id,
-                                flex_vector_load{
-                                    .rbts = info.rbts,
-                                });
+        flex_vectors = std::move(flex_vectors).set(id, info.rbts);
     }
 
     return {
@@ -262,15 +219,6 @@ void serialize(Archive& ar, inner_node& value)
 }
 
 template <class Archive>
-void serialize(Archive& ar, relaxed_rbts_info& value)
-{
-    auto& root  = value.root;
-    auto& tail  = value.tail;
-    auto& shift = value.shift;
-    ar(CEREAL_NVP(root), CEREAL_NVP(tail), CEREAL_NVP(shift));
-}
-
-template <class Archive>
 void serialize(Archive& ar, rbts_info& value)
 {
     auto& root = value.root;
@@ -296,12 +244,6 @@ void save(Archive& ar, const vector_save<T, MemoryPolicy, B, BL>& value)
     serialize(ar, const_cast<rbts_info&>(value.rbts));
 }
 
-template <class Archive>
-void load(Archive& ar, vector_load& value)
-{
-    serialize(ar, value.rbts);
-}
-
 template <class Archive,
           typename T,
           typename MemoryPolicy,
@@ -309,13 +251,7 @@ template <class Archive,
           immer::detail::rbts::bits_t BL>
 void save(Archive& ar, const flex_vector_save<T, MemoryPolicy, B, BL>& value)
 {
-    serialize(ar, const_cast<relaxed_rbts_info&>(value.rbts));
-}
-
-template <class Archive>
-void load(Archive& ar, flex_vector_load& value)
-{
-    serialize(ar, value.rbts);
+    serialize(ar, const_cast<rbts_info&>(value.rbts));
 }
 
 template <class Archive,

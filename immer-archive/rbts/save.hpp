@@ -235,10 +235,9 @@ save_to_archive(immer::flex_vector<T, MemoryPolicy, B, BL> vec,
                                .set(vector_id,
                                     flex_vector_save<T, MemoryPolicy, B, BL>{
                                         .rbts =
-                                            relaxed_rbts_info{
-                                                .root  = root_id,
-                                                .tail  = tail_id,
-                                                .shift = impl.shift,
+                                            rbts_info{
+                                                .root = root_id,
+                                                .tail = tail_id,
                                             },
                                         .vector = std::move(vec),
                                     });

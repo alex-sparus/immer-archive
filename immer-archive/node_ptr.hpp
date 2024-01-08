@@ -56,7 +56,7 @@ public:
         }
     }
 
-    operator bool() const { return ptr; }
+    explicit operator bool() const { return ptr; }
 
     Node* release() &&
     {

@@ -662,8 +662,7 @@ TEST_CASE("A loop with 2 nodes")
                 "key": 0,
                 "value": {
                     "root": 0,
-                    "tail": 1,
-                    "shift": 6
+                    "tail": 1
                 }
             }
         ]
@@ -946,7 +945,6 @@ TEST_CASE("Test modifying flex vector nodes")
              {
                  {"root", 0},
                  {"tail", 1},
-                 {"shift", 1},
              }},
         },
     };
@@ -1234,7 +1232,7 @@ TEST_CASE("Test flex vector with a weird shape relaxed")
         {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", true}}}},
     };
     data["value0"]["flex_vectors"] = {
-        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}, {"shift", 6}}}}};
+        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}}}}};
     data["value0"]["vectors"] = json_t::array();
 
     const auto loaded = load_flex_vec(data.dump(), 0);
@@ -1269,7 +1267,7 @@ TEST_CASE("Test flex vector with a weird shape strict", "[valgrind]")
         {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", false}}}},
     };
     data["value0"]["flex_vectors"] = {
-        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}, {"shift", 6}}}}};
+        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}}}}};
     data["value0"]["vectors"] = json_t::array();
 
     const auto loaded = load_flex_vec(data.dump(), 0);
@@ -1291,3 +1289,18 @@ TEST_CASE("Test flex vector with a weird shape strict", "[valgrind]")
 
     REQUIRE(loaded == expected);
 }
+
+// TEST_CASE("Test flex vector with uneven depth")
+// {
+//     const auto small = gen(example_flex_vector{}, 5);
+//     const auto vec2  = small + small + small;
+//     const auto vec   = example_flex_vector{0, 1} + vec2;
+//     {
+//         auto ar        = immer_archive::rbts::make_save_archive_for(vec);
+//         auto vector_id = immer_archive::rbts::node_id{};
+//         std::tie(ar, vector_id) = immer_archive::rbts::save_to_archive(vec,
+//         ar);
+//         // SPDLOG_INFO("{}", test::to_json(ar));
+//         REQUIRE(test::to_json(ar) == "");
+//     }
+// }

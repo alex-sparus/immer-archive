@@ -52,6 +52,16 @@ inline constexpr auto get_shift_for_depth()
            bits * (depth - hana::integral_c<immer::detail::rbts::shift_t, 1>);
 }
 
+inline constexpr auto
+get_shift_for_depth_runtime(immer::detail::rbts::bits_t b,
+                            immer::detail::rbts::bits_t bl,
+                            immer::detail::rbts::count_t depth)
+{
+    auto bits      = immer::detail::rbts::shift_t{b};
+    auto bits_leaf = immer::detail::rbts::shift_t{bl};
+    return bits_leaf + bits * (immer::detail::rbts::shift_t{depth} - 1);
+}
+
 template <immer::detail::rbts::bits_t B, immer::detail::rbts::bits_t BL>
 inline auto get_shift_for_size(immer::detail::rbts::size_t size)
 {
@@ -149,11 +159,11 @@ public:
         }
 
         const auto relaxed_allowed = false;
-        auto root = load_inner(info->rbts.root, {}, relaxed_allowed);
-        auto tail = load_leaf(info->rbts.tail);
+        auto root = load_inner(info->root, {}, relaxed_allowed);
+        auto tail = load_leaf(info->tail);
 
         const auto tree_size =
-            get_node_size(info->rbts.root) + get_node_size(info->rbts.tail);
+            get_node_size(info->root) + get_node_size(info->tail);
 
         auto impl = rbtree{tree_size,
                            get_shift_for_size<B, BL>(tree_size),
@@ -172,14 +182,16 @@ public:
         }
 
         const auto relaxed_allowed = true;
-        auto root = load_inner(info->rbts.root, {}, relaxed_allowed);
-        auto tail = load_leaf(info->rbts.tail);
+        auto root = load_inner(info->root, {}, relaxed_allowed);
+        auto tail = load_leaf(info->tail);
 
         const auto tree_size =
-            get_node_size(info->rbts.root) + get_node_size(info->rbts.tail);
+            get_node_size(info->root) + get_node_size(info->tail);
+        const auto depth = get_node_depth(info->root);
+        const auto shift = get_shift_for_depth_runtime(B, BL, depth);
 
         auto impl = rrbtree{tree_size,
-                            info->rbts.shift,
+                            shift,
                             std::move(root).release(),
                             std::move(tail).release()};
 
@@ -345,10 +357,34 @@ private:
         return size;
     }
 
+    immer::detail::rbts::count_t get_node_depth(node_id id)
+    {
+        if (auto* p = depths_.find(id)) {
+            return *p;
+        }
+        auto depth = [&]() -> immer::detail::rbts::count_t {
+            if (auto* p = ar_.leaves.find(id)) {
+                return 0;
+            }
+            if (auto* p = ar_.inners.find(id)) {
+                if (p->children.empty()) {
+                    return 1;
+                } else {
+                    return 1 + get_node_depth(p->children.front());
+                }
+            }
+            throw invalid_node_id{id};
+        }();
+        depths_ = std::move(depths_).set(id, depth);
+        return depth;
+    }
+
     template <class Tree>
     void verify_tree(const Tree& impl)
     {
-        const auto check_inner = [&](auto&& pos, auto&& visit) {
+        const auto check_inner = [&](auto&& pos,
+                                     auto&& visit,
+                                     bool visiting_relaxed) {
             const auto* id = loaded_inners_.find(pos.node());
             if (!id) {
                 if (loaded_leaves_.find(pos.node())) {
@@ -365,6 +401,17 @@ private:
                 throw std::logic_error{
                     "No info for the just loaded inner node"};
             }
+
+            /**
+             * NOTE: Not sure how useful this check is.
+             */
+            // if (visiting_relaxed != info->relaxed) {
+            //     throw std::logic_error{fmt::format(
+            //         "Node {} is expected to be relaxed == {} but it is {}",
+            //         *id,
+            //         info->relaxed,
+            //         visiting_relaxed)};
+            // }
 
             const auto expected_count = pos.count();
             const auto real_count     = get_node_children(*info).size();
@@ -384,11 +431,13 @@ private:
             boost::hana::overload(
                 [&](detail::regular_pos_tag, auto&& pos, auto&& visit) {
                     // SPDLOG_INFO("regular_pos_tag");
-                    check_inner(pos, visit);
+                    const bool visiting_relaxed = false;
+                    check_inner(pos, visit, visiting_relaxed);
                 },
                 [&](detail::relaxed_pos_tag, auto&& pos, auto&& visit) {
                     // SPDLOG_INFO("relaxed_pos_tag");
-                    check_inner(pos, visit);
+                    const bool visiting_relaxed = true;
+                    check_inner(pos, visit, visiting_relaxed);
                 },
                 [&](detail::leaf_pos_tag, auto&& pos, auto&& visit) {
                     // SPDLOG_INFO("leaf_pos_tag");
@@ -421,6 +470,7 @@ private:
     immer::map<node_t*, node_id> loaded_leaves_;
     immer::map<node_t*, node_id> loaded_inners_;
     immer::map<node_id, std::size_t> sizes_;
+    immer::map<node_id, immer::detail::rbts::count_t> depths_;
 };
 
 template <typename T,
