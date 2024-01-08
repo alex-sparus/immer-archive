@@ -736,14 +736,18 @@ TEST_CASE("Test vector with very big objects")
     using big_object_node_t = node_for<big_object>;
     static_assert(big_object_node_t::bits_leaf == 1);
     static_assert(sizeof(big_object) == 40);
-    // 96 probably because 40 is aligned to 48, times two.
-    static_assert(big_object_node_t::max_sizeof_leaf == 96);
+    // 96 is in Debug probably because 40 is aligned to 48, times two.
+    // 88 is in Release. The actual number doesn't really matter, it's just here
+    // to have an idea of the sizes we're dealing with.
+    static_assert(big_object_node_t::max_sizeof_leaf == 96 ||
+                  big_object_node_t::max_sizeof_leaf == 88);
 
     using int_node_t = node_for<int>;
     static_assert(int_node_t::bits_leaf == 1);
     static_assert(sizeof(int) == 4);
     // show_type<boost::hana::size_t<int_node_t::max_sizeof_leaf>> show;
-    static_assert(int_node_t::max_sizeof_leaf == 24);
+    static_assert(int_node_t::max_sizeof_leaf == 24 ||
+                  int_node_t::max_sizeof_leaf == 16);
 
     const auto small_vec = gen(test::vector_one<big_object>{}, 67);
 

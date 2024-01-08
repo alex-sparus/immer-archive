@@ -68,8 +68,6 @@ struct archive_builder
             .relaxed = true,
         };
 
-        auto* node = pos.node();
-        auto* r    = node->relaxed();
         auto index = std::size_t{};
         pos.each(visitor_helper{},
                  [&](auto any_tag, auto& child_pos, auto&&) mutable {
@@ -81,7 +79,7 @@ struct archive_builder
                      visit(child_pos);
                  });
 
-        assert(node_info.children.size() == r->d.count);
+        assert(node_info.children.size() == pos.node()->relaxed()->d.count);
 
         ar.inners = std::move(ar.inners).set(id, node_info);
     }

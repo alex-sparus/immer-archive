@@ -24,8 +24,7 @@ stdenv.mkDerivation rec {
     immer
   ];
 
-  # Problems with having those separate json files. Either fix that or rewrite the tests to not depend on the files.
-  doCheck = false;
+  doCheck = true;
 
   # Currently, the code has a memory leak
   cmakeFlags = ["-DTESTS_WITH_LEAK_SANITIZER=OFF" "-DBUILD_TESTS=OFF"];

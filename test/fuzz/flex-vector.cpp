@@ -11,6 +11,7 @@
 #include <immer/box.hpp>
 #include <immer/flex_vector.hpp>
 
+#include <fmt/ranges.h>
 #include <immer-archive/rbts/load.hpp>
 #include <immer-archive/rbts/save.hpp>
 #include <test/utils.hpp>
@@ -21,7 +22,8 @@ namespace {
 void require_eq(const auto& a, const auto& b)
 {
     if (a != b) {
-        throw std::runtime_error{fmt::format("{} != {}", a, b)};
+        throw std::runtime_error{
+            fmt::format("{} != {}", fmt::join(a, ", "), fmt::join(b, ", "))};
     }
 }
 } // namespace
@@ -36,22 +38,15 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
         immer::flex_vector<int, immer::default_memory_policy, bits, bits>;
     using size_t = std::uint8_t;
 
-    const auto check_shift = [&](const auto& vec) {
-        const auto real = vec.impl().shift;
-        const auto calculated =
-            immer_archive::rbts::get_shift_for_size<bits, bits>(vec.size());
-        if (real != calculated) {
-            SPDLOG_INFO("size = {}, real = {}, calculated = {}",
-                        vec.size(),
-                        real,
-                        calculated);
-            auto ar        = immer_archive::rbts::make_save_archive_for(vec);
-            auto vector_id = immer_archive::rbts::node_id{};
-            std::tie(ar, vector_id) =
-                immer_archive::rbts::save_to_archive(vec, ar);
-            SPDLOG_INFO("{}", test::to_json(ar));
-            throw std::runtime_error{fmt::format("{} != {}", real, calculated)};
-        }
+    const auto check_save_and_load = [&](const auto& vec) {
+        auto ar        = immer_archive::rbts::make_save_archive_for(vec);
+        auto vector_id = immer_archive::rbts::node_id{};
+        std::tie(ar, vector_id) = immer_archive::rbts::save_to_archive(vec, ar);
+
+        auto loader =
+            immer_archive::rbts::make_loader_for(vec, fix_leaf_nodes(ar));
+        auto loaded = loader.load(vector_id);
+        require_eq(vec, loaded);
     };
 
     auto vars = std::array<vector_t, var_count>{};
@@ -97,7 +92,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
         auto src      = read<char>(in, is_valid_var);
         auto dst      = read<char>(in, is_valid_var);
         const auto op = read<char>(in);
-        SPDLOG_INFO("op = {}", static_cast<int>(op));
+        SPDLOG_DEBUG("op = {}", static_cast<int>(op));
         switch (op) {
         case op_push_back: {
             vars[dst] = vars[src].push_back(42);
@@ -182,8 +177,8 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
             break;
         };
 
-        check_shift(vars[src]);
-        check_shift(vars[dst]);
+        check_save_and_load(vars[src]);
+        check_save_and_load(vars[dst]);
 
         return true;
     });
