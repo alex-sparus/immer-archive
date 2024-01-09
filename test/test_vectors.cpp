@@ -947,6 +947,16 @@ TEST_CASE("Test modifying flex vector nodes")
                 },
             },
         },
+        {
+            {"key", 902},
+            {
+                "value",
+                {
+                    {"children", {2, 2, 3, 4}},
+                    {"relaxed", true},
+                },
+            },
+        },
     };
     data["value0"]["flex_vectors"] = {
         {
@@ -1031,6 +1041,15 @@ TEST_CASE("Test modifying flex vector nodes")
     {
         auto& item = data["value0"]["inners"][0];
         REQUIRE(item["key"] == 0);
+        SECTION("Mix leaves and inners as children")
+        {
+            auto& children = item["value"]["children"];
+            REQUIRE(children == json_t::array({2, 3, 4, 5, 2, 3, 4}));
+            children = {2, 3, 4, 902, 4};
+            REQUIRE_THROWS_AS(
+                load_flex_vec(data.dump(), 0),
+                immer_archive::rbts::same_depth_children_exception);
+        }
         SECTION("No children")
         {
             item["value"]["children"] = json_t::array();
@@ -1198,8 +1217,8 @@ TEST_CASE("Test more inner nodes")
         auto& children = data["value0"]["inners"][0]["value"]["children"];
         REQUIRE(children == json_t::array({2, 35}));
         children = {2, 28};
-        // XXX
-        // REQUIRE(load_vec(data.dump(), 0) == gen(example_vector{}, 67));
+        REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
+                          immer_archive::rbts::same_depth_children_exception);
     }
 }
 

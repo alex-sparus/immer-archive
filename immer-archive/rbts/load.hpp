@@ -59,6 +59,24 @@ public:
     node_id id;
 };
 
+class same_depth_children_exception : public archive_exception
+{
+public:
+    same_depth_children_exception(node_id id,
+                                  std::size_t expected_depth,
+                                  node_id child_id,
+                                  std::size_t real_depth)
+        : archive_exception{
+              fmt::format("All children of node {} must have the same depth "
+                          "{}, but the child {} has depth {}",
+                          id,
+                          expected_depth,
+                          child_id,
+                          real_depth)}
+    {
+    }
+};
+
 template <class T,
           typename MemoryPolicy,
           immer::detail::rbts::bits_t B,
@@ -172,8 +190,6 @@ private:
             throw invalid_node_id{id};
         }
 
-        loading_nodes = std::move(loading_nodes).insert(id);
-
         const auto children_ids = get_node_children(*node_info);
 
         const auto n         = children_ids.size();
@@ -196,34 +212,27 @@ private:
                            [n](auto* ptr) { node_t::delete_inner_r(ptr, n); }}
                 : node_ptr{node_t::make_inner_n(n),
                            [n](auto* ptr) { node_t::delete_inner(ptr, n); }};
-        auto children = immer::vector<node_ptr>{};
-
         if (is_relaxed) {
             inner.get()->relaxed()->d.count = n;
-            auto index                      = std::size_t{};
-            auto running_size               = std::size_t{};
-            for (const auto& child_node_id : children_ids) {
-                auto child = load_some_node(
-                    child_node_id, loading_nodes, relaxed_allowed);
-                running_size += get_node_size(child_node_id);
-
-                auto* raw_ptr = child.get();
-                children      = std::move(children).push_back(std::move(child));
-                inner.get()->inner()[index]            = raw_ptr;
-                inner.get()->relaxed()->d.sizes[index] = running_size;
-                ++index;
-            }
-        } else {
-            auto index = std::size_t{};
-            for (const auto& child_node_id : children_ids) {
-                auto child = load_some_node(
-                    child_node_id, loading_nodes, relaxed_allowed);
-                auto* raw_ptr = child.get();
-                children      = std::move(children).push_back(std::move(child));
-                inner.get()->inner()[index] = raw_ptr;
-                ++index;
-            }
         }
+
+        auto children     = immer::vector<node_ptr>{};
+        auto running_size = std::size_t{};
+        for_each_child(id,
+                       children_ids,
+                       std::move(loading_nodes).insert(id),
+                       relaxed_allowed,
+                       [&](auto index, const auto& child_node_id, auto child) {
+                           auto* raw_ptr = child.get();
+                           children =
+                               std::move(children).push_back(std::move(child));
+                           inner.get()->inner()[index] = raw_ptr;
+                           if (is_relaxed) {
+                               running_size += get_node_size(child_node_id);
+                               inner.get()->relaxed()->d.sizes[index] =
+                                   running_size;
+                           }
+                       });
 
         inners_        = std::move(inners_).set(id,
                                          inner_node_ptr{
@@ -306,6 +315,32 @@ private:
         }();
         depths_ = std::move(depths_).set(id, depth);
         return depth;
+    }
+
+    template <class F>
+    void for_each_child(node_id id,
+                        const immer::vector<node_id>& children_ids,
+                        const nodes_set_t& loading_nodes,
+                        bool relaxed_allowed,
+                        F&& proc)
+    {
+        auto index          = std::size_t{};
+        auto children_depth = immer::detail::rbts::count_t{};
+        for (const auto& child_node_id : children_ids) {
+            auto child =
+                load_some_node(child_node_id, loading_nodes, relaxed_allowed);
+            if (index == 0) {
+                children_depth = get_node_depth(child_node_id);
+            } else {
+                auto depth = get_node_depth(child_node_id);
+                if (depth != children_depth) {
+                    throw same_depth_children_exception{
+                        id, children_depth, child_node_id, depth};
+                }
+            }
+            proc(index, child_node_id, std::move(child));
+            ++index;
+        }
     }
 
     template <class Tree>
