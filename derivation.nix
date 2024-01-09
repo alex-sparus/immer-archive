@@ -9,6 +9,7 @@
   boost,
   nlohmann_json,
   immer,
+  build-tests ? false,
 }:
 stdenv.mkDerivation rec {
   pname = "immer-archive";
@@ -27,7 +28,14 @@ stdenv.mkDerivation rec {
   doCheck = true;
 
   # Currently, the code has a memory leak
-  cmakeFlags = ["-DTESTS_WITH_LEAK_SANITIZER=OFF" "-DBUILD_TESTS=OFF"];
+  cmakeFlags = [
+    "-DTESTS_WITH_LEAK_SANITIZER=OFF"
+    "-DBUILD_TESTS=${
+      if build-tests
+      then "ON"
+      else "OFF"
+    }"
+  ];
 
   nativeBuildInputs = [ninja cmake];
 }
