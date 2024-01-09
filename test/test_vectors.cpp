@@ -818,6 +818,12 @@ TEST_CASE("Test modifying vector nodes")
         REQUIRE(load_vec(data.dump(), 0) == vec);
     }
 
+    SECTION("Load non-existing vector")
+    {
+        REQUIRE_THROWS_AS(load_vec(data.dump(), 99),
+                          immer_archive::archive_exception);
+    }
+
     SECTION("Invalid root id")
     {
         data["value0"]["vectors"][0]["value"]["root"] = 1;
@@ -960,6 +966,11 @@ TEST_CASE("Test modifying flex vector nodes")
         const auto vec = small_vec + small_vec + test::flex_vector_one<int>{99};
         REQUIRE(load_flex_vec(data.dump(), 0) == vec);
     }
+    SECTION("Load non-existing vector")
+    {
+        REQUIRE_THROWS_AS(load_flex_vec(data.dump(), 99),
+                          immer_archive::archive_exception);
+    }
     SECTION("Non-relaxed vector can not have relaxed nodes")
     {
         data["value0"]["vectors"]      = data["value0"]["flex_vectors"];
@@ -1095,46 +1106,6 @@ TEST_CASE("Print shift calculation", "[.print_shift]")
     }
 }
 
-namespace {
-template <class B_BL>
-struct verify_shift_calculation
-{
-    static bool run()
-    {
-        using namespace hana::literals;
-        constexpr auto B  = hana::value<decltype(std::declval<B_BL>()[0_c])>();
-        constexpr auto BL = hana::value<decltype(std::declval<B_BL>()[1_c])>();
-        using Vector = immer::vector<int, immer::default_memory_policy, B, BL>;
-        auto vec     = Vector{};
-        constexpr auto max_vector_length = 90000;
-        for (auto index = 0; index < max_vector_length; ++index) {
-            INFO("B = " << B);
-            INFO("BL = " << BL);
-            INFO("size = " << vec.size());
-            REQUIRE(vec.impl().shift ==
-                    immer_archive::rbts::get_shift_for_size<B, BL>(vec.size()));
-        }
-        return true;
-    }
-};
-} // namespace
-
-// Generate a tuple of pairs (B, BL) for each B [3, 7] and BL [1, 5].
-using Bs_BLs = decltype([] {
-    constexpr auto bs   = hana::range_c<immer::detail::rbts::bits_t, 3, 8>;
-    constexpr auto bls  = hana::range_c<immer::detail::rbts::bits_t, 1, 6>;
-    constexpr auto prod = hana::cartesian_product(hana::make_tuple(bs, bls));
-    return hana::to<hana::ext::std::tuple_tag>(prod);
-}());
-
-TEMPLATE_LIST_TEST_CASE_METHOD(verify_shift_calculation,
-                               "Verify shift calculation",
-                               "[shift][slow]",
-                               Bs_BLs)
-{
-    REQUIRE(verify_shift_calculation<TestType>::run());
-}
-
 TEST_CASE("Test more inner nodes")
 {
     json_t data;
@@ -1221,6 +1192,14 @@ TEST_CASE("Test more inner nodes")
         //     item["value"]["children"] = {35, 560};
         //     REQUIRE(load_vec(data.dump(), 0) == example_vector{64, 65, 66});
         // }
+    }
+    SECTION("Mix leaves and inners as children")
+    {
+        auto& children = data["value0"]["inners"][0]["value"]["children"];
+        REQUIRE(children == json_t::array({2, 35}));
+        children = {2, 28};
+        // XXX
+        // REQUIRE(load_vec(data.dump(), 0) == gen(example_vector{}, 67));
     }
 }
 

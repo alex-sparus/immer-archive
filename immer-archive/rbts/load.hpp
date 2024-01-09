@@ -14,86 +14,13 @@
 
 namespace immer_archive::rbts {
 
-template <immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL,
-          immer::detail::rbts::count_t Depth>
-inline constexpr auto get_max_vector_size_for_depth()
-{
-    namespace hana = boost::hana;
-
-    constexpr auto depth =
-        hana::integral_c<immer::detail::rbts::count_t, Depth>;
-
-    constexpr auto children_inner =
-        hana::integral_c<immer::detail::rbts::size_t,
-                         immer::detail::rbts::branches<B>>;
-    constexpr auto children_leaf =
-        hana::integral_c<immer::detail::rbts::size_t,
-                         immer::detail::rbts::branches<BL>>;
-    constexpr auto root_size =
-        hana::power(children_inner, depth) * children_leaf;
-    return root_size + children_leaf;
-}
-
-template <immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL,
-          immer::detail::rbts::count_t Depth>
-inline constexpr auto get_shift_for_depth()
-{
-    namespace hana = boost::hana;
-
-    constexpr auto bits = hana::integral_c<immer::detail::rbts::shift_t, B>;
-    constexpr auto bits_leaf =
-        hana::integral_c<immer::detail::rbts::shift_t, BL>;
-    constexpr auto depth =
-        hana::integral_c<immer::detail::rbts::shift_t, Depth>;
-
-    return bits_leaf +
-           bits * (depth - hana::integral_c<immer::detail::rbts::shift_t, 1>);
-}
-
-inline constexpr auto
-get_shift_for_depth_runtime(immer::detail::rbts::bits_t b,
-                            immer::detail::rbts::bits_t bl,
-                            immer::detail::rbts::count_t depth)
+inline constexpr auto get_shift_for_depth(immer::detail::rbts::bits_t b,
+                                          immer::detail::rbts::bits_t bl,
+                                          immer::detail::rbts::count_t depth)
 {
     auto bits      = immer::detail::rbts::shift_t{b};
     auto bits_leaf = immer::detail::rbts::shift_t{bl};
     return bits_leaf + bits * (immer::detail::rbts::shift_t{depth} - 1);
-}
-
-template <immer::detail::rbts::bits_t B, immer::detail::rbts::bits_t BL>
-inline auto get_shift_for_size(immer::detail::rbts::size_t size)
-{
-    namespace hana = boost::hana;
-
-    // Let's assume depth 12 is enough.
-    constexpr auto max_depth = immer::detail::rbts::count_t{12};
-    constexpr auto really_big_number_of_elements = 2305843009213693954;
-    static_assert(get_max_vector_size_for_depth<5, 1, max_depth>().value ==
-                  really_big_number_of_elements);
-
-    auto found = false;
-    auto shift = immer::detail::rbts::shift_t{};
-    hana::for_each(
-        hana::range_c<immer::detail::rbts::count_t, 1, max_depth + 1>,
-        [&](auto d) {
-            if (found) {
-                return;
-            }
-            constexpr auto max_size =
-                get_max_vector_size_for_depth<B, BL, d.value>();
-            if (size <= max_size) {
-                found = true;
-                shift = get_shift_for_depth<B, BL, d.value>();
-            }
-        });
-
-    if (!found) {
-        throw std::invalid_argument{"size must be way too big"};
-    }
-
-    return shift;
 }
 
 class vector_corrupted_exception : public archive_exception
@@ -164,9 +91,11 @@ public:
 
         const auto tree_size =
             get_node_size(info->root) + get_node_size(info->tail);
+        const auto depth = get_node_depth(info->root);
+        const auto shift = get_shift_for_depth(B, BL, depth);
 
         auto impl = rbtree{tree_size,
-                           get_shift_for_size<B, BL>(tree_size),
+                           shift,
                            std::move(root).release(),
                            std::move(tail).release()};
 
@@ -188,7 +117,7 @@ public:
         const auto tree_size =
             get_node_size(info->root) + get_node_size(info->tail);
         const auto depth = get_node_depth(info->root);
-        const auto shift = get_shift_for_depth_runtime(B, BL, depth);
+        const auto shift = get_shift_for_depth(B, BL, depth);
 
         auto impl = rrbtree{tree_size,
                             shift,
