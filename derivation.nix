@@ -9,12 +9,16 @@
   boost,
   nlohmann_json,
   immer,
+  lib,
   build-tests ? false,
 }:
 stdenv.mkDerivation rec {
   pname = "immer-archive";
   version = "0.0";
-  src = ./.;
+  src = lib.cleanSourceWith {
+    filter = name: type: !(lib.hasSuffix ".nix" name);
+    src = ./.;
+  };
   buildInputs = [
     spdlog
     arximboldi-cereal

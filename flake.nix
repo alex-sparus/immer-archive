@@ -78,41 +78,45 @@
           ];
       };
 
-      arximboldi-cereal = pkgs.callPackage cereal-derivation {};
-
-      defaultPackage = pkgs.callPackage ./derivation.nix {
-        stdenv = our_llvm.stdenv;
-        immer = immer.defaultPackage.${system};
-        inherit arximboldi-cereal;
-      };
-
-      packages = {
-        run-tests-with-valgrind = let
-          pkg =
-            (pkgs.callPackage ./derivation.nix {
-              stdenv = our_llvm.stdenv;
-              immer = immer.defaultPackage.${system};
-              inherit arximboldi-cereal;
-              build-tests = true;
-            })
-            .overrideAttrs (prev: {
-              cmakeFlags = prev.cmakeFlags ++ ["-DCMAKE_BUILD_TYPE=Debug"];
-              doCheck = false;
-            });
-        in
+      packages = let
+        arximboldi-cereal = pkgs.callPackage cereal-derivation {};
+        immer-archive = pkgs.callPackage ./derivation.nix {
+          stdenv = our_llvm.stdenv;
+          immer = immer.defaultPackage.${system};
+          inherit arximboldi-cereal;
+        };
+        debug-tests =
+          (immer-archive.override {build-tests = true;})
+          .overrideAttrs (prev: {
+            cmakeFlags = prev.cmakeFlags ++ ["-DCMAKE_BUILD_TYPE=Debug"];
+            doCheck = false;
+          });
+      in
+        {
+          inherit immer-archive debug-tests;
+          default = immer-archive;
+        }
+        // (
           if pkgs.stdenv.isLinux
-          then
-            pkgs.writeShellApplication {
+          then {
+            # tag valgrind contains the test that is broken and must be fixed
+            run-tests-with-valgrind = pkgs.writeShellApplication {
               name = "runner";
               runtimeInputs = [pkgs.valgrind];
               text = ''
-                valgrind ${pkg}/bin/tests -- '[valgrind]'
+                valgrind ${debug-tests}/bin/tests '~[valgrind]'
               '';
-            }
-          else
-            pkgs.writeScriptBin "runner" ''
-              echo Only linux has support for valgrind
-            '';
-      };
+            };
+
+            run-broken-test = pkgs.writeShellApplication {
+              name = "runner";
+              runtimeInputs = [pkgs.valgrind];
+              text = ''
+                valgrind ${debug-tests}/bin/tests '[valgrind]'
+              '';
+            };
+          }
+          else {}
+        );
     });
 }
