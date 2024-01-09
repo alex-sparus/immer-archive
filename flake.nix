@@ -85,5 +85,34 @@
         immer = immer.defaultPackage.${system};
         inherit arximboldi-cereal;
       };
+
+      packages = {
+        run-tests-with-valgrind = let
+          pkg =
+            (pkgs.callPackage ./derivation.nix {
+              stdenv = our_llvm.stdenv;
+              immer = immer.defaultPackage.${system};
+              inherit arximboldi-cereal;
+              build-tests = true;
+            })
+            .overrideAttrs (prev: {
+              cmakeFlags = prev.cmakeFlags ++ ["-DCMAKE_BUILD_TYPE=Debug"];
+              doCheck = false;
+            });
+        in
+          if pkgs.stdenv.isLinux
+          then
+            pkgs.writeShellApplication {
+              name = "runner";
+              runtimeInputs = [pkgs.valgrind];
+              text = ''
+                valgrind ${pkg}/bin/tests -- '[valgrind]'
+              '';
+            }
+          else
+            pkgs.writeScriptBin "runner" ''
+              echo Only linux has support for valgrind
+            '';
+      };
     });
 }
