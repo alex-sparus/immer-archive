@@ -47,7 +47,7 @@ public:
         archive.saveValue(value);
     }
 
-    ImmerArchives& get_archives() { return archives; }
+    ImmerArchives& get_output_archives() { return archives; }
 
     void finalize()
     {
@@ -86,7 +86,7 @@ public:
         archive.loadValue(value);
     }
 
-    ImmerArchives& get_archives() { return archives; }
+    ImmerArchives& get_input_archives() { return archives; }
 
 private:
     cereal::JSONInputArchive archive;

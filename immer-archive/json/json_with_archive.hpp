@@ -178,7 +178,7 @@ auto to_json_with_archive(const T& serializable)
         auto ar =
             immer_archive::json_immer_output_archive<decltype(archives)>{os};
         ar(serializable);
-        archives = ar.get_archives();
+        archives = ar.get_output_archives();
 
         {
             auto os2 = std::ostringstream{};
@@ -186,10 +186,10 @@ auto to_json_with_archive(const T& serializable)
                 immer_archive::json_immer_output_archive<decltype(archives)>{
                     archives, os2};
             ar2(archives);
-            archives = ar2.get_archives();
+            archives = ar2.get_output_archives();
         }
 
-        ar.get_archives() = archives;
+        ar.get_output_archives() = archives;
         if constexpr (!is_archive_empty(archives)) {
             ar.finalize();
         }

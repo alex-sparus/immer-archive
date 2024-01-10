@@ -2,6 +2,7 @@
 
 #include <immer-archive/errors.hpp>
 #include <immer-archive/json/json_immer.hpp>
+#include <immer-archive/json/json_with_archive.hpp>
 #include <immer-archive/traits.hpp>
 
 #include <fmt/format.h>
@@ -40,27 +41,42 @@ struct archivable
     friend auto end(const archivable& value) { return value.container.end(); }
 };
 
-template <class ImmerArchives, class Container>
-void save(json_immer_output_archive<ImmerArchives>& ar,
-          const archivable<Container>& value)
+template <class Storage, class Names, class Container>
+auto save_minimal(
+    const json_immer_output_archive<detail::archives_save<Storage, Names>>& ar,
+    const archivable<Container>& value)
 {
     auto& save_archive =
-        ar.get_archives().template get_save_archive<Container>();
+        const_cast<
+            json_immer_output_archive<detail::archives_save<Storage, Names>>&>(
+            ar)
+            .get_output_archives()
+            .template get_save_archive<Container>();
     auto [archive, id] =
         save_to_archive(value.container, std::move(save_archive));
     save_archive = std::move(archive);
-    ar(id);
+    return id;
+}
+
+// This function must exist because cereal does some checks and it's not
+// possible to have only load_minimal for a type without having save_minimal.
+template <class Storage, class Names, class Container>
+auto save_minimal(
+    const json_immer_output_archive<detail::archives_load<Storage, Names>>& ar,
+    const archivable<Container>& value) ->
+    typename container_traits<Container>::container_id
+{
+    throw std::logic_error{"Should never be called"};
 }
 
 template <class ImmerArchives, class Container>
-void load(json_immer_input_archive<ImmerArchives>& ar,
-          archivable<Container>& value)
+void load_minimal(const json_immer_input_archive<ImmerArchives>& ar,
+                  archivable<Container>& value,
+                  const typename container_traits<Container>::container_id& id)
 {
-    using container_id = typename container_traits<Container>::container_id;
-    auto id            = container_id{};
-    ar(id);
-
-    auto& loader = ar.get_archives().template get_loader<Container>();
+    auto& loader = const_cast<json_immer_input_archive<ImmerArchives>&>(ar)
+                       .get_input_archives()
+                       .template get_loader<Container>();
 
     constexpr auto is_optional = boost::hana::is_valid(
         [](auto&& x) -> decltype((void) x.has_value()) {});
@@ -85,12 +101,22 @@ void load(json_immer_input_archive<ImmerArchives>& ar,
     }
 }
 
+// This function must exist because cereal does some checks and it's not
+// possible to have only load_minimal for a type without having save_minimal.
 template <class Archive, class Container>
-void load(Archive& ar, archivable<Container>& value)
+auto save_minimal(const Archive& ar, const archivable<Container>& value) ->
+    typename container_traits<Container>::container_id
 {
-    using container_id = typename container_traits<Container>::container_id;
-    auto id            = container_id{};
-    ar(id);
+    throw std::logic_error{"Should never be called"};
+}
+
+template <class Archive, class Container>
+void load_minimal(const Archive& ar,
+                  archivable<Container>& value,
+                  const typename container_traits<Container>::container_id& id)
+{
+    // This one is actually called while loading with not-yet-fully-loaded
+    // archive.
 }
 
 } // namespace immer_archive

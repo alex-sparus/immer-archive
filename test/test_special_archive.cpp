@@ -400,12 +400,12 @@ TEST_CASE("Special archive loads empty test_data")
     const auto json_archive_str = R"(
         {
             "value0": {
-                "ints": {"value0": 0},
-                "strings": {"value0": 0},
-                "flex_ints": {"value0": 0},
-                "map": {"value0": 0},
-                "metas": {"value0": 0},
-                "single_meta": {"ints": {"value0": 0}, "metas": {"value0": 0}}
+                "ints": 0,
+                "strings": 0,
+                "flex_ints": 0,
+                "map": 0,
+                "metas": 0,
+                "single_meta": {"ints": 0, "metas": 0}
             },
             "archives": {
                 "ints": {
@@ -475,12 +475,12 @@ TEST_CASE("Special archive throws cereal::Exception")
     const auto json_archive_str = R"(
         {
             "value0": {
-                "ints": {"value0": 99},
-                "strings": {"value0": 0},
-                "flex_ints": {"value0": 0},
-                "map": {"value0": 0},
-                "metas": {"value0": 0},
-                "single_meta": {"ints": {"value0": 0}, "metas": {"value0": 0}}
+                "ints": 99,
+                "strings": 0,
+                "flex_ints": 0,
+                "map": 0,
+                "metas": 0,
+                "single_meta": {"ints": 0, "metas": 0}
             },
             "archives": {
                 "ints": {
@@ -533,8 +533,7 @@ TEST_CASE("Special archive throws cereal::Exception")
             })";
 
     REQUIRE_THROWS_MATCHES(
-        immer_archive::from_json_with_archive<std::decay_t<decltype(value)>>(
-            json_archive_str),
+        immer_archive::from_json_with_archive<test_data>(json_archive_str),
         ::cereal::Exception,
         Catch::Matchers::Message("Failed to load a container ID 99 from the "
                                  "archive: Unknown vector ID 99"));
