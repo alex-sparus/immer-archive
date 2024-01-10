@@ -1220,6 +1220,59 @@ TEST_CASE("Test more inner nodes")
         REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
                           immer_archive::rbts::same_depth_children_exception);
     }
+    SECTION("Strict vector can't contain relaxed nodes at all")
+    {
+        SECTION("Relaxed root, 0")
+        {
+            auto& inners = data["value0"]["inners"];
+            auto& item   = inners[0]["value"];
+            REQUIRE_FALSE(item["relaxed"]);
+            item["relaxed"] = true;
+            REQUIRE_THROWS_AS(
+                load_vec(data.dump(), 0),
+                immer_archive::rbts::relaxed_node_not_allowed_exception);
+        }
+        SECTION("Relaxed non-root")
+        {
+            auto& inners = data["value0"]["inners"];
+            auto& item   = inners[1]["value"];
+            REQUIRE_FALSE(item["relaxed"]);
+            item["relaxed"] = true;
+            REQUIRE_THROWS_AS(
+                load_vec(data.dump(), 0),
+                immer_archive::rbts::relaxed_node_not_allowed_exception);
+        }
+    }
+    SECTION("Flex vector loads as well")
+    {
+        data["value0"]["flex_vectors"] = data["value0"]["vectors"];
+        data["value0"]["vectors"]      = json_t::array();
+        REQUIRE(load_flex_vec(data.dump(), 0) == gen(example_vector{}, 67));
+
+        auto& inners = data["value0"]["inners"];
+        SECTION("Relaxed 0 can contain non-relaxed")
+        {
+            auto& item = inners[0]["value"];
+            REQUIRE_FALSE(item["relaxed"]);
+            item["relaxed"] = true;
+            REQUIRE(load_flex_vec(data.dump(), 0) == gen(example_vector{}, 67));
+
+            SECTION("Relaxed 0 can contain relaxed 2")
+            {
+                inners[1]["value"]["relaxed"] = true;
+                REQUIRE(load_flex_vec(data.dump(), 0) ==
+                        gen(example_vector{}, 67));
+            }
+        }
+        SECTION("Strict 0 can't contain relaxed 2")
+        {
+            inners[1]["value"]["relaxed"]  = true;
+            inners[1]["value"]["children"] = {3, 4, 5};
+            REQUIRE_THROWS_AS(
+                load_flex_vec(data.dump(), 0),
+                immer_archive::rbts::relaxed_node_not_allowed_exception);
+        }
+    }
 }
 
 TEST_CASE("Test flex vector with a weird shape relaxed")

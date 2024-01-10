@@ -54,6 +54,7 @@
             license = lib.licenses.bsd3;
           };
         };
+      arximboldi-cereal = pkgs.callPackage cereal-derivation {};
     in rec {
       devShell = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
         packages = with pkgs;
@@ -79,7 +80,6 @@
       };
 
       packages = let
-        arximboldi-cereal = pkgs.callPackage cereal-derivation {};
         immer-archive = pkgs.callPackage ./derivation.nix {
           stdenv = our_llvm.stdenv;
           immer = immer.defaultPackage.${system};

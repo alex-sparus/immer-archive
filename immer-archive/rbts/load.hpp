@@ -50,8 +50,8 @@ class relaxed_node_not_allowed_exception : public archive_exception
 {
 public:
     relaxed_node_not_allowed_exception(node_id id_)
-        : archive_exception{fmt::format(
-              "Non-relaxed vector can not have relaxed node ID {}", id_)}
+        : archive_exception{fmt::format("Node ID {} can't be a relaxed node",
+                                        id_)}
         , id{id_}
     {
     }
@@ -201,6 +201,11 @@ private:
         // The code doesn't handle very well a relaxed node with size zero.
         // Pretend it's a strict node.
         const bool is_relaxed = node_info->relaxed && n > 0;
+
+        if (!is_relaxed) {
+            // Children of a non-relaxed node are not allowed to be relaxed.
+            relaxed_allowed = false;
+        }
 
         if (is_relaxed && !relaxed_allowed) {
             throw relaxed_node_not_allowed_exception{id};
