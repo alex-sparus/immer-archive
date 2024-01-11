@@ -10,6 +10,12 @@ template <typename Node>
 class node_ptr
 {
 public:
+    node_ptr()
+        : ptr{nullptr}
+        , deleter{}
+    {
+    }
+
     node_ptr(Node* ptr_, std::function<void(Node* ptr)> deleter_)
         : ptr{ptr_}
         , deleter{std::move(deleter_)}
@@ -17,7 +23,6 @@ public:
         SPDLOG_TRACE("ctor {} with ptr {}", (void*) this, (void*) ptr);
         // Assuming the node has just been created and not calling inc() on
         // it.
-        ptr->inc();
     }
 
     node_ptr(const node_ptr& other)
@@ -31,19 +36,25 @@ public:
     }
 
     node_ptr(node_ptr&& other)
-        : ptr{std::move(other).release()}
-        , deleter{other.deleter}
+        : node_ptr{}
     {
         SPDLOG_TRACE("move ctor {} from {}", (void*) this, (void*) &other);
+        swap(*this, other);
+    }
+
+    node_ptr& operator=(const node_ptr& other)
+    {
+        SPDLOG_TRACE("copy assign {} = {}", (void*) this, (void*) &other);
+        auto temp = other;
+        swap(*this, temp);
+        return *this;
     }
 
     node_ptr& operator=(node_ptr&& other)
     {
         SPDLOG_TRACE("move assign {} = {}", (void*) this, (void*) &other);
         auto temp = node_ptr{std::move(other)};
-        using std::swap;
-        swap(ptr, temp.ptr);
-        swap(deleter, temp.deleter);
+        swap(*this, temp);
         return *this;
     }
 
@@ -66,6 +77,13 @@ public:
     }
 
     Node* get() { return ptr; }
+
+    friend void swap(node_ptr& x, node_ptr& y)
+    {
+        using std::swap;
+        swap(x.ptr, y.ptr);
+        swap(x.deleter, y.deleter);
+    }
 
 private:
     Node* ptr;

@@ -5,6 +5,8 @@
 
 #include <boost/hana.hpp>
 
+#include <optional>
+
 /**
  * to_json_with_archive
  */

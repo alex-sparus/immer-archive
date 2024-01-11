@@ -223,21 +223,20 @@ private:
 
         auto children     = immer::vector<node_ptr>{};
         auto running_size = std::size_t{};
-        for_each_child(id,
-                       children_ids,
-                       std::move(loading_nodes).insert(id),
-                       relaxed_allowed,
-                       [&](auto index, const auto& child_node_id, auto child) {
-                           auto* raw_ptr = child.get();
-                           children =
-                               std::move(children).push_back(std::move(child));
-                           inner.get()->inner()[index] = raw_ptr;
-                           if (is_relaxed) {
-                               running_size += get_node_size(child_node_id);
-                               inner.get()->relaxed()->d.sizes[index] =
-                                   running_size;
-                           }
-                       });
+        for_each_child(
+            id,
+            children_ids,
+            std::move(loading_nodes).insert(id),
+            relaxed_allowed,
+            [&](auto index, const auto& child_node_id, auto child) {
+                auto to_save = child;
+                children     = std::move(children).push_back(std::move(child));
+                inner.get()->inner()[index] = std::move(to_save).release();
+                if (is_relaxed) {
+                    running_size += get_node_size(child_node_id);
+                    inner.get()->relaxed()->d.sizes[index] = running_size;
+                }
+            });
 
         inners_        = std::move(inners_).set(id,
                                          inner_node_ptr{

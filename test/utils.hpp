@@ -10,6 +10,7 @@
 #include <cereal/types/vector.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 namespace test {
 
@@ -83,3 +84,7 @@ struct test_value
 };
 
 } // namespace test
+
+template <>
+struct fmt::formatter<test::test_value> : ostream_formatter
+{};

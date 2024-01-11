@@ -119,11 +119,11 @@ TEST_CASE("Save and load vectors with shared nodes")
     }
 
     // Load them and verify they're equal to the original vectors
-    auto loader = example_loader{fix_leaf_nodes(ar)};
+    auto loader = std::make_optional(example_loader{fix_leaf_nodes(ar)});
     std::vector<example_vector> loaded;
     auto index = std::size_t{};
     for (const auto& id : ids) {
-        auto v = loader.load_vector(id);
+        auto v = loader->load_vector(id);
         REQUIRE(v == vectors[index]);
         loaded.push_back(v);
         ++index;
@@ -132,8 +132,15 @@ TEST_CASE("Save and load vectors with shared nodes")
     SPDLOG_DEBUG("loaded == vectors {}", loaded == vectors);
     REQUIRE(loaded == vectors);
 
-    loaded = {};
-    // Now the loader should deallocate all the nodes it has.
+    SECTION("Deallocate loaded first, loader should collect all nodes")
+    {
+        loaded = {};
+        // Now the loader should deallocate all the nodes it has.
+    }
+    SECTION("Deallocate loader first, vectors should collect their nodes")
+    {
+        loader.reset();
+    }
 }
 
 TEST_CASE("Save and load vectors and flex vectors with shared nodes")
@@ -331,6 +338,38 @@ TEST_CASE("Test saving and loading vectors of different lengths", "[slow]")
                 }
             });
     }
+}
+
+TEST_CASE("Test flex vectors memory leak")
+{
+    constexpr auto for_each_generated_length_flex =
+        [](auto init, int count, auto&& process) {
+            process(init);
+            process(init + init);
+            for (int i = 0; i < count; ++i) {
+                auto prev = init;
+                init      = std::move(init).push_back(i);
+
+                process(init);
+                process(prev + init);
+                process(init + prev);
+                process(init + init);
+            }
+        };
+
+    auto ar = example_archive_save{};
+    for_each_generated_length_flex(
+        test::flex_vector_one<int>{}, 50, [&](const auto& vec) {
+            auto id1          = immer_archive::rbts::node_id{};
+            std::tie(ar, id1) = save_to_archive(vec, ar);
+
+            {
+                // Loads correctly
+                auto loader        = example_loader{fix_leaf_nodes(ar)};
+                const auto loaded1 = loader.load_flex_vector(id1);
+                REQUIRE(loaded1 == vec);
+            }
+        });
 }
 
 TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
@@ -1344,18 +1383,3 @@ TEST_CASE("Test flex vector with a weird shape strict", "[valgrind]")
 
     REQUIRE(loaded == expected);
 }
-
-// TEST_CASE("Test flex vector with uneven depth")
-// {
-//     const auto small = gen(example_flex_vector{}, 5);
-//     const auto vec2  = small + small + small;
-//     const auto vec   = example_flex_vector{0, 1} + vec2;
-//     {
-//         auto ar        = immer_archive::rbts::make_save_archive_for(vec);
-//         auto vector_id = immer_archive::rbts::node_id{};
-//         std::tie(ar, vector_id) = immer_archive::rbts::save_to_archive(vec,
-//         ar);
-//         // SPDLOG_INFO("{}", test::to_json(ar));
-//         REQUIRE(test::to_json(ar) == "");
-//     }
-// }

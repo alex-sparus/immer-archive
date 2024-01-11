@@ -27,6 +27,18 @@ using test::flex_vector_one;
 using test::test_value;
 using test::vector_one;
 
+template <class T>
+std::string string_via_tie(const T& value)
+{
+    std::string result;
+    hana::for_each(value.tie(), [&](const auto& item) {
+        using Item = std::decay_t<decltype(item)>;
+        result += (result.empty() ? "" : ", ") +
+                  Catch::StringMaker<Item>::convert(item);
+    });
+    return result;
+}
+
 struct meta_meta
 {
     immer_archive::archivable<vector_one<int>> ints;
@@ -37,6 +49,11 @@ struct meta_meta
     friend bool operator==(const meta_meta& left, const meta_meta& right)
     {
         return left.tie() == right.tie();
+    }
+
+    friend std::ostream& operator<<(std::ostream& s, const meta_meta& value)
+    {
+        return s << string_via_tie(value);
     }
 
     template <class Archive>
@@ -56,6 +73,11 @@ struct meta
     friend bool operator==(const meta& left, const meta& right)
     {
         return left.tie() == right.tie();
+    }
+
+    friend std::ostream& operator<<(std::ostream& s, const meta& value)
+    {
+        return s << string_via_tie(value);
     }
 
     template <class Archive>
@@ -134,19 +156,15 @@ inline auto get_archives_types(const std::pair<test_data, test_data>&)
     return get_archives_types(test_data{});
 }
 
-template <class T>
-std::string string_via_tie(const T& value)
-{
-    std::string result;
-    hana::for_each(value.tie(), [&](const auto& item) {
-        using Item = std::decay_t<decltype(item)>;
-        result += (result.empty() ? "" : ", ") +
-                  Catch::StringMaker<Item>::convert(item);
-    });
-    return result;
-}
-
 } // namespace
+
+template <>
+struct fmt::formatter<meta_meta> : ostream_formatter
+{};
+
+template <>
+struct fmt::formatter<meta> : ostream_formatter
+{};
 
 namespace Catch {
 template <>

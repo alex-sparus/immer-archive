@@ -57,6 +57,7 @@
       arximboldi-cereal = pkgs.callPackage cereal-derivation {};
     in rec {
       devShell = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
+        NIX_HARDENING_ENABLE = "";
         packages = with pkgs;
           [
             clang-format
@@ -76,6 +77,7 @@
           ]
           ++ lib.optionals stdenv.isLinux [
             valgrind
+            lldb
           ];
       };
 
