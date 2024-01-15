@@ -107,14 +107,14 @@ public:
             ++index;
         }
 
-        inners_ =
-            std::move(inners_).set(id,
-                                   std::make_pair(
-                                       inner_node_ptr{
-                                           .node     = inner,
-                                           .children = std::move(children),
-                                       },
-                                       values));
+        inners_ = std::move(inners_).set(
+            id,
+            std::make_pair(
+                inner_node_ptr{
+                    .node = inner,
+                    //    .children = std::move(children),
+                },
+                values));
         return {std::move(inner), std::move(values)};
     }
 

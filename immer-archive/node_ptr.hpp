@@ -7,31 +7,59 @@
 namespace immer_archive {
 
 template <typename Node>
-class node_ptr
+struct ptr_with_deleter
 {
-public:
-    node_ptr()
+    Node* ptr;
+    std::function<void(Node* ptr)> deleter;
+
+    ptr_with_deleter()
         : ptr{nullptr}
         , deleter{}
     {
     }
 
-    node_ptr(Node* ptr_, std::function<void(Node* ptr)> deleter_)
+    ptr_with_deleter(Node* ptr_, std::function<void(Node* ptr)> deleter_)
         : ptr{ptr_}
         , deleter{std::move(deleter_)}
     {
-        SPDLOG_TRACE("ctor {} with ptr {}", (void*) this, (void*) ptr);
+    }
+
+    void dec() const
+    {
+        if (ptr && ptr->dec()) {
+            SPDLOG_TRACE("calling deleter for {}", (void*) ptr);
+            deleter(ptr);
+        }
+    }
+
+    friend void swap(ptr_with_deleter& x, ptr_with_deleter& y)
+    {
+        using std::swap;
+        swap(x.ptr, y.ptr);
+        swap(x.deleter, y.deleter);
+    }
+};
+
+template <typename Node>
+class node_ptr
+{
+public:
+    node_ptr() = default;
+
+    node_ptr(Node* ptr_, std::function<void(Node* ptr)> deleter_)
+        : ptr{ptr_, std::move(deleter_)}
+    {
+        SPDLOG_TRACE("ctor {} with ptr {}", (void*) this, (void*) ptr.ptr);
         // Assuming the node has just been created and not calling inc() on
         // it.
     }
 
     node_ptr(const node_ptr& other)
         : ptr{other.ptr}
-        , deleter{other.deleter}
     {
         SPDLOG_TRACE("copy ctor {} from {}", (void*) this, (void*) &other);
-        if (ptr) {
-            ptr->inc();
+        if (ptr.ptr) {
+            ptr.ptr->inc();
         }
     }
 
@@ -61,40 +89,41 @@ public:
     ~node_ptr()
     {
         SPDLOG_TRACE("dtor {}", (void*) this);
-        if (ptr && ptr->dec()) {
-            SPDLOG_TRACE("calling deleter for {}", (void*) ptr);
-            deleter(ptr);
-        }
+        ptr.dec();
     }
 
-    explicit operator bool() const { return ptr; }
+    explicit operator bool() const { return ptr.ptr; }
 
     Node* release() &&
     {
-        auto result = ptr;
-        ptr         = nullptr;
+        auto result = ptr.ptr;
+        ptr.ptr     = nullptr;
         return result;
     }
 
-    Node* get() { return ptr; }
+    auto release_full() &&
+    {
+        auto result = ptr;
+        ptr         = {};
+        return result;
+    }
+
+    Node* get() { return ptr.ptr; }
 
     friend void swap(node_ptr& x, node_ptr& y)
     {
         using std::swap;
         swap(x.ptr, y.ptr);
-        swap(x.deleter, y.deleter);
     }
 
 private:
-    Node* ptr;
-    std::function<void(Node* ptr)> deleter;
+    ptr_with_deleter<Node> ptr;
 };
 
 template <typename Node>
 struct inner_node_ptr
 {
     node_ptr<Node> node;
-    immer::vector<node_ptr<Node>> children;
 };
 
 } // namespace immer_archive

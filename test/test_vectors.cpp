@@ -344,32 +344,83 @@ TEST_CASE("Test flex vectors memory leak")
 {
     constexpr auto for_each_generated_length_flex =
         [](auto init, int count, auto&& process) {
-            process(init);
-            process(init + init);
             for (int i = 0; i < count; ++i) {
-                auto prev = init;
-                init      = std::move(init).push_back(i);
-
+                init = std::move(init).push_back(i);
                 process(init);
-                process(prev + init);
-                process(init + prev);
-                process(init + init);
             }
         };
 
-    auto ar = example_archive_save{};
-    for_each_generated_length_flex(
-        test::flex_vector_one<int>{}, 50, [&](const auto& vec) {
-            auto id1          = immer_archive::rbts::node_id{};
-            std::tie(ar, id1) = save_to_archive(vec, ar);
+    constexpr auto max_length = 350;
 
-            {
-                // Loads correctly
-                auto loader        = example_loader{fix_leaf_nodes(ar)};
-                const auto loaded1 = loader.load_flex_vector(id1);
-                REQUIRE(loaded1 == vec);
-            }
-        });
+    SECTION("Loader deallocates nodes")
+    {
+        auto loaders = std::vector<example_loader>{};
+
+        for_each_generated_length_flex(
+            test::flex_vector_one<int>{}, max_length, [&](const auto& vec) {
+                auto ar           = example_archive_save{};
+                auto id1          = immer_archive::rbts::node_id{};
+                std::tie(ar, id1) = save_to_archive(vec, ar);
+
+                {
+                    // Loads correctly
+                    loaders.emplace_back(fix_leaf_nodes(ar));
+                    auto& loader       = loaders.back();
+                    const auto loaded1 = loader.load_flex_vector(id1);
+                    REQUIRE(loaded1 == vec);
+                }
+            });
+    }
+    SECTION("Inner node should deallocate its children")
+    {
+        /**
+         * The goal is to trigger the branch where the loader has to deallocate
+         * an inner node AND its children which also must be inner nodes.
+         *
+         * It's not that easy because if a child is a leaf, leaves are stored in
+         * the separate map `immer::map<node_id, node_ptr> leaves_` and
+         * therefore, will never be deallocated by an inner node.
+         *
+         * So it must be an inner node that has the last pointer to another
+         * inner node.
+         */
+        auto ar   = example_archive_save{};
+        auto ids  = std::vector<immer_archive::rbts::node_id>{};
+        auto vecs = std::vector<test::flex_vector_one<int>>{};
+
+        for_each_generated_length_flex(
+            test::flex_vector_one<int>{}, max_length, [&](const auto& vec) {
+                auto id1          = immer_archive::rbts::node_id{};
+                std::tie(ar, id1) = save_to_archive(vec, ar);
+                ids.push_back(id1);
+                vecs.push_back(vec);
+            });
+
+        auto index = std::size_t{};
+        for (const auto& id : ids) {
+            auto loader        = example_loader{fix_leaf_nodes(ar)};
+            const auto loaded1 = loader.load_flex_vector(id);
+            REQUIRE(loaded1 == vecs[index]);
+            ++index;
+        }
+    }
+    SECTION("Vector deallocates nodes")
+    {
+        for_each_generated_length_flex(
+            test::flex_vector_one<int>{}, max_length, [&](const auto& vec) {
+                auto ar           = example_archive_save{};
+                auto id1          = immer_archive::rbts::node_id{};
+                std::tie(ar, id1) = save_to_archive(vec, ar);
+
+                {
+                    // Loads correctly
+                    const auto loaded1 =
+                        example_loader{fix_leaf_nodes(ar)}.load_flex_vector(
+                            id1);
+                    REQUIRE(loaded1 == vec);
+                }
+            });
+    }
 }
 
 TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")

@@ -182,7 +182,7 @@ private:
         }
 
         if (auto* p = inners_.find(id)) {
-            return p->node;
+            return *p;
         }
 
         auto* node_info = ar_.inners.find(id);
@@ -211,38 +211,57 @@ private:
             throw relaxed_node_not_allowed_exception{id};
         }
 
-        auto inner =
-            is_relaxed
-                ? node_ptr{node_t::make_inner_r_n(n),
-                           [n](auto* ptr) { node_t::delete_inner_r(ptr, n); }}
-                : node_ptr{node_t::make_inner_n(n),
-                           [n](auto* ptr) { node_t::delete_inner(ptr, n); }};
+        /**
+         * We have to have the same behavior of inner nodes deallocating
+         * children as vectors themselves, otherwise memory leaks appear.
+         *
+         * Specifically this: children's ref-counts must be decreased only when
+         * the inner node that references them is deleted.
+         */
+        auto children = immer::vector<ptr_with_deleter<node_t>>{};
+        for_each_child(id,
+                       children_ids,
+                       std::move(loading_nodes).insert(id),
+                       relaxed_allowed,
+                       [&](auto index, const auto& child_node_id, auto child) {
+                           children = std::move(children).push_back(
+                               std::move(child).release_full());
+                       });
+        const auto delete_children = [children]() {
+            for (const auto& ptr : children) {
+                ptr.dec();
+            }
+        };
+
+        auto inner = is_relaxed ? node_ptr{node_t::make_inner_r_n(n),
+                                           [n, delete_children](auto* ptr) {
+                                               node_t::delete_inner_r(ptr, n);
+                                               delete_children();
+                                           }}
+                                : node_ptr{node_t::make_inner_n(n),
+                                           [n, delete_children](auto* ptr) {
+                                               node_t::delete_inner(ptr, n);
+                                               delete_children();
+                                           }};
         if (is_relaxed) {
             inner.get()->relaxed()->d.count = n;
         }
 
-        auto children     = immer::vector<node_ptr>{};
-        auto running_size = std::size_t{};
-        for_each_child(
-            id,
-            children_ids,
-            std::move(loading_nodes).insert(id),
-            relaxed_allowed,
-            [&](auto index, const auto& child_node_id, auto child) {
-                auto to_save = child;
-                children     = std::move(children).push_back(std::move(child));
-                inner.get()->inner()[index] = std::move(to_save).release();
+        {
+            auto running_size = std::size_t{};
+            auto index        = std::size_t{};
+            for (const auto& child_node_id : children_ids) {
+                inner.get()->inner()[index] = children[index].ptr;
                 if (is_relaxed) {
                     running_size += get_node_size(child_node_id);
                     inner.get()->relaxed()->d.sizes[index] = running_size;
                 }
-            });
 
-        inners_        = std::move(inners_).set(id,
-                                         inner_node_ptr{
-                                                    .node     = inner,
-                                                    .children = std::move(children),
-                                         });
+                ++index;
+            }
+        }
+
+        inners_        = std::move(inners_).set(id, inner);
         loaded_inners_ = std::move(loaded_inners_).set(inner.get(), id);
         return inner;
     }
@@ -434,7 +453,7 @@ private:
 private:
     const archive_load<T> ar_;
     immer::map<node_id, node_ptr> leaves_;
-    immer::map<node_id, inner_node_ptr> inners_;
+    immer::map<node_id, node_ptr> inners_;
     immer::map<node_t*, node_id> loaded_leaves_;
     immer::map<node_t*, node_id> loaded_inners_;
     immer::map<node_id, std::size_t> sizes_;
