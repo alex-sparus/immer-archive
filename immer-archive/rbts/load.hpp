@@ -6,6 +6,7 @@
 #include <immer-archive/rbts/traverse.hpp>
 
 #include <boost/hana.hpp>
+#include <boost/range/adaptor/indexed.hpp>
 #include <immer/set.hpp>
 #include <immer/vector.hpp>
 #include <optional>
@@ -218,15 +219,24 @@ private:
          * Specifically this: children's ref-counts must be decreased only when
          * the inner node that references them is deleted.
          */
-        auto children = immer::vector<ptr_with_deleter<node_t>>{};
-        for_each_child(id,
-                       children_ids,
-                       std::move(loading_nodes).insert(id),
-                       relaxed_allowed,
-                       [&](auto index, const auto& child_node_id, auto child) {
-                           children = std::move(children).push_back(
-                               std::move(child).release_full());
-                       });
+        auto children = [&] {
+            /**
+             * NOTE: load_children may throw an exception if same-depth
+             * validation doesn't pass. Be careful with release_full, nodes will
+             * not be freed automatically.
+             */
+            auto children_ptrs =
+                load_children(id,
+                              children_ids,
+                              std::move(loading_nodes).insert(id),
+                              relaxed_allowed);
+            auto result = immer::vector<ptr_with_deleter<node_t>>{};
+            for (auto& item : children_ptrs) {
+                result =
+                    std::move(result).push_back(std::move(item).release_full());
+            }
+            return result;
+        }();
         const auto delete_children = [children]() {
             for (const auto& ptr : children) {
                 ptr.dec();
@@ -249,15 +259,13 @@ private:
 
         {
             auto running_size = std::size_t{};
-            auto index        = std::size_t{};
-            for (const auto& child_node_id : children_ids) {
+            for (const auto& [index, child_node_id] :
+                 boost::adaptors::index(children_ids)) {
                 inner.get()->inner()[index] = children[index].ptr;
                 if (is_relaxed) {
                     running_size += get_node_size(child_node_id);
                     inner.get()->relaxed()->d.sizes[index] = running_size;
                 }
-
-                ++index;
             }
         }
 
@@ -340,30 +348,31 @@ private:
         return depth;
     }
 
-    template <class F>
-    void for_each_child(node_id id,
-                        const immer::vector<node_id>& children_ids,
-                        const nodes_set_t& loading_nodes,
-                        bool relaxed_allowed,
-                        F&& proc)
+    std::vector<node_ptr>
+    load_children(node_id id,
+                  const immer::vector<node_id>& children_ids,
+                  const nodes_set_t& loading_nodes,
+                  bool relaxed_allowed)
     {
-        auto index          = std::size_t{};
         auto children_depth = immer::detail::rbts::count_t{};
+        auto result         = std::vector<node_ptr>{};
         for (const auto& child_node_id : children_ids) {
+            // Better to load the node first and then check the depth, because
+            // loading has extra protections against loops.
             auto child =
                 load_some_node(child_node_id, loading_nodes, relaxed_allowed);
-            if (index == 0) {
-                children_depth = get_node_depth(child_node_id);
-            } else {
-                auto depth = get_node_depth(child_node_id);
-                if (depth != children_depth) {
-                    throw same_depth_children_exception{
-                        id, children_depth, child_node_id, depth};
-                }
+
+            const auto depth = get_node_depth(child_node_id);
+            if (result.empty()) {
+                children_depth = depth;
+            } else if (depth != children_depth) {
+                throw same_depth_children_exception{
+                    id, children_depth, child_node_id, depth};
             }
-            proc(index, child_node_id, std::move(child));
-            ++index;
+
+            result.emplace_back(std::move(child));
         }
+        return result;
     }
 
     template <class Tree>

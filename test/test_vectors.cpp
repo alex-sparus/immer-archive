@@ -1365,6 +1365,73 @@ TEST_CASE("Test more inner nodes")
     }
 }
 
+TEST_CASE("Exception while loading children")
+{
+    // spdlog::set_level(spdlog::level::trace);
+    json_t data;
+    data["value0"]["leaves"] = {
+        {
+            {"key", 1},
+            {"value", {6, 99}},
+        },
+        {
+            {"key", 2},
+            {"value", {0, 1}},
+        },
+        {
+            {"key", 3},
+            {"value", {2, 3}},
+        },
+        {
+            {"key", 4},
+            {"value", {4, 5}},
+        },
+        {
+            {"key", 5},
+            {"value", {6}},
+        },
+    };
+    data["value0"]["inners"] = {
+        {
+            {"key", 0},
+            {
+                "value",
+                {
+                    {"children", {2, 3, 4, 5, 2, 3, 4}},
+                    {"relaxed", true},
+                },
+            },
+        },
+        {
+            {"key", 902},
+            {
+                "value",
+                {
+                    {"children", {5}},
+                    {"relaxed", true},
+                },
+            },
+        },
+    };
+    data["value0"]["flex_vectors"] = {
+        {
+            {"key", 0},
+            {"value",
+             {
+                 {"root", 0},
+                 {"tail", 1},
+             }},
+        },
+    };
+    data["value0"]["vectors"] = json_t::array();
+
+    auto& children = data["value0"]["inners"][0]["value"]["children"];
+    REQUIRE(children == json_t::array({2, 3, 4, 5, 2, 3, 4}));
+    children = {2, 3, 4, 902, 4};
+    REQUIRE_THROWS_AS(load_flex_vec(data.dump(), 0),
+                      immer_archive::rbts::same_depth_children_exception);
+}
+
 TEST_CASE("Test flex vector with a weird shape relaxed")
 {
     json_t data;
