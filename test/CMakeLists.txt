@@ -41,8 +41,8 @@ elseif(LINUX)
     target_link_options(tests PRIVATE -fsanitize=address)
   endif()
   target_compile_definitions(tests PRIVATE BOOST_USE_ASAN=1)
-  target_compile_definitions(tests
-                             PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+  target_compile_definitions(
+    tests PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE IMMER_NO_FREE_LIST=1)
 else()
   # macOS but not Xcode ninja && ASAN_OPTIONS=detect_leaks=1
   # LSAN_OPTIONS=suppressions=../suppr.txt ./tests
@@ -54,8 +54,8 @@ else()
     target_link_options(tests PRIVATE -fsanitize=address)
   endif()
   target_compile_definitions(tests PRIVATE BOOST_USE_ASAN=1)
-  target_compile_definitions(tests
-                             PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+  target_compile_definitions(
+    tests PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE IMMER_NO_FREE_LIST=1)
 endif()
 
 add_subdirectory(fuzz)

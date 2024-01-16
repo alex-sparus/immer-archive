@@ -219,7 +219,7 @@ private:
          * Specifically this: children's ref-counts must be decreased only when
          * the inner node that references them is deleted.
          */
-        auto children = [&] {
+        const auto children = [&] {
             /**
              * NOTE: load_children may throw an exception if same-depth
              * validation doesn't pass. Be careful with release_full, nodes will

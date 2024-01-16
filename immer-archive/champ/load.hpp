@@ -6,6 +6,7 @@
 
 #include <immer/flex_vector.hpp>
 
+#include <boost/range/adaptor/indexed.hpp>
 #include <spdlog/spdlog.h>
 
 namespace immer_archive {
@@ -66,18 +67,43 @@ public:
             throw invalid_node_id{id};
         }
 
+        auto values = values_t{};
+
+        // Load children
+        const auto children = [&values, &node_info, this] {
+            auto [children_ptrs, children_values] =
+                load_children(node_info->children);
+
+            if (!children_values.empty()) {
+                values = std::move(values) + children_values;
+            }
+
+            auto result = immer::vector<ptr_with_deleter<node_t>>{};
+            for (auto& child : children_ptrs) {
+                result = std::move(result).push_back(
+                    std::move(child).release_full());
+            }
+            return result;
+        }();
+        const auto delete_children = [children]() {
+            for (const auto& ptr : children) {
+                ptr.dec();
+            }
+        };
+
         const auto n  = node_info->children.size();
         const auto nv = node_info->values.data.size();
-        auto inner    = node_ptr{node_t::make_inner_n(n, nv),
-                              [](auto* ptr) { node_t::delete_inner(ptr); }};
+        auto inner =
+            node_ptr{node_t::make_inner_n(n, nv), [delete_children](auto* ptr) {
+                         node_t::delete_inner(ptr);
+                         delete_children();
+                     }};
         inner.get()->impl.d.data.inner.nodemap = node_info->nodemap;
         inner.get()->impl.d.data.inner.datamap = node_info->datamap;
 
         // XXX Loading validation
         assert(inner.get()->children_count() == n);
         assert(inner.get()->data_count() == nv);
-
-        auto values = values_t{};
 
         // Values
         if (nv) {
@@ -87,24 +113,10 @@ public:
             values = std::move(values).push_back(node_info->values.data);
         }
 
-        // Children
-        auto children = immer::vector<node_ptr>{};
-        auto index    = std::size_t{};
-        for (const auto& child_node_id : node_info->children) {
-            auto [child, child_values] = load_some_node(child_node_id);
-            if (!child) {
-                throw std::invalid_argument{
-                    fmt::format("Failed to load node ID {}", child_node_id)};
-            }
-
-            if (!child_values.empty()) {
-                values = std::move(values) + child_values;
-            }
-
-            auto* raw_ptr = child.get();
-            children      = std::move(children).push_back(std::move(child));
-            inner.get()->children()[index] = raw_ptr;
-            ++index;
+        // Set children
+        for (const auto& [index, child_ptr] :
+             boost::adaptors::index(children)) {
+            inner.get()->children()[index] = child_ptr.ptr;
         }
 
         inners_ = std::move(inners_).set(
@@ -127,6 +139,27 @@ public:
             return load_collision(id);
         }
         throw invalid_node_id{id};
+    }
+
+    std::pair<std::vector<node_ptr>, values_t>
+    load_children(const immer::vector<node_id>& children_ids)
+    {
+        auto children = std::vector<node_ptr>{};
+        auto values   = values_t{};
+        for (const auto& child_node_id : children_ids) {
+            auto [child, child_values] = load_some_node(child_node_id);
+            if (!child) {
+                throw archive_exception{
+                    fmt::format("Failed to load node ID {}", child_node_id)};
+            }
+
+            if (!child_values.empty()) {
+                values = std::move(values) + child_values;
+            }
+
+            children.push_back(std::move(child));
+        }
+        return {std::move(children), std::move(values)};
     }
 
 private:
