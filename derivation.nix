@@ -30,6 +30,8 @@ stdenv.mkDerivation rec {
   ];
 
   doCheck = true;
+  hardeningDisable = ["all"];
+  dontStrip = true;
 
   # Currently, the code has a memory leak
   cmakeFlags = [

@@ -61,3 +61,4 @@ endif()
 add_subdirectory(fuzz)
 
 install(TARGETS tests DESTINATION bin)
+install(FILES valgrind.supp DESTINATION bin)

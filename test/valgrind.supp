@@ -1,0 +1,67 @@
+{
+   empty_map
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:make_inner_n
+   fun:empty
+   fun:map
+}
+{
+   empty_set
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:make_inner_n
+   fun:empty
+   fun:set
+}
+{
+   empty_vector_tail
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:make_leaf_n
+   fun:empty_tail
+   ...
+   fun:vector
+}
+{
+   empty_vector_root
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:make_inner_n
+   fun:empty_root
+   ...
+   fun:vector
+}
+{
+   empty_table
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:make_inner_n
+   fun:empty
+   fun:table
+}
+{
+   empty_tail_from_initializer_list
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:make_leaf_n
+   fun:empty_tail
+   ...
+   fun:from_initializer_list*
+}
+{
+   empty_root_from_initializer_list
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:make_inner_n
+   fun:empty_root
+   ...
+   fun:from_initializer_list*
+}
