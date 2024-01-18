@@ -28,8 +28,8 @@ template <typename Archive,
           typename E,
           typename MP,
           std::uint32_t B>
-std::enable_if_t<has_auto_id<K, T>::value> CEREAL_LOAD_FUNCTION_NAME(
-    Archive& ar, immer::map<K, T, H, E, MP, B>& m)
+std::enable_if_t<has_auto_id<K, T>::value>
+CEREAL_LOAD_FUNCTION_NAME(Archive& ar, immer::map<K, T, H, E, MP, B>& m)
 {
     size_type size;
     ar(make_size_tag(size));
@@ -51,8 +51,8 @@ template <typename Archive,
           typename E,
           typename MP,
           std::uint32_t B>
-std::enable_if_t<has_auto_id<K, T>::value> CEREAL_SAVE_FUNCTION_NAME(
-    Archive& ar, const immer::map<K, T, H, E, MP, B>& m)
+std::enable_if_t<has_auto_id<K, T>::value>
+CEREAL_SAVE_FUNCTION_NAME(Archive& ar, const immer::map<K, T, H, E, MP, B>& m)
 {
     ar(make_size_tag(static_cast<size_type>(m.size())));
     for (auto&& v : m)
@@ -66,8 +66,8 @@ template <typename Archive,
           typename E,
           typename MP,
           std::uint32_t B>
-std::enable_if_t<!has_auto_id<K, T>::value> CEREAL_LOAD_FUNCTION_NAME(
-    Archive& ar, immer::map<K, T, H, E, MP, B>& m)
+std::enable_if_t<!has_auto_id<K, T>::value>
+CEREAL_LOAD_FUNCTION_NAME(Archive& ar, immer::map<K, T, H, E, MP, B>& m)
 {
     size_type size;
     ar(make_size_tag(size));
@@ -89,8 +89,8 @@ template <typename Archive,
           typename E,
           typename MP,
           std::uint32_t B>
-std::enable_if_t<!has_auto_id<K, T>::value> CEREAL_SAVE_FUNCTION_NAME(
-    Archive& ar, const immer::map<K, T, H, E, MP, B>& m)
+std::enable_if_t<!has_auto_id<K, T>::value>
+CEREAL_SAVE_FUNCTION_NAME(Archive& ar, const immer::map<K, T, H, E, MP, B>& m)
 {
     ar(make_size_tag(static_cast<size_type>(m.size())));
     for (auto&& v : m)

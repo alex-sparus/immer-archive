@@ -31,3 +31,6 @@ tools/clojure/.lein*
 b/**
 build/**
 b-*/
+
+/.pre-commit-config.yaml
+/.vscode

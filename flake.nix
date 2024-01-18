@@ -4,6 +4,13 @@
   inputs = {
     nixpkgs.url = github:NixOS/nixpkgs/nixpkgs-unstable;
     flake-utils.url = "github:numtide/flake-utils";
+    pre-commit-hooks = {
+      url = "github:cachix/pre-commit-hooks.nix";
+      inputs = {
+        flake-compat.follows = "flake-compat";
+        flake-utils.follows = "flake-utils";
+      };
+    };
     flake-compat = {
       url = "github:edolstra/flake-compat";
       flake = false;
@@ -24,6 +31,7 @@
     self,
     nixpkgs,
     flake-utils,
+    pre-commit-hooks,
     flake-compat,
     arximboldi-cereal-src,
     immer,
@@ -56,8 +64,23 @@
         };
       arximboldi-cereal = pkgs.callPackage cereal-derivation {};
     in rec {
+      checks = {
+        pre-commit-check = pre-commit-hooks.lib.${system}.run {
+          src = ./.;
+          hooks = {
+            cmake-format.enable = true;
+            clang-format = {
+              enable = true;
+              types_or = pkgs.lib.mkForce ["c" "c++"];
+            };
+            alejandra.enable = true;
+          };
+        };
+      };
+
       devShell = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
         NIX_HARDENING_ENABLE = "";
+        inherit (self.checks.${system}.pre-commit-check) shellHook;
         packages = with pkgs;
           [
             clang-format
