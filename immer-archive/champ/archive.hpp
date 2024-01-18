@@ -19,19 +19,6 @@ namespace champ {
 
 using node_id = std::uint64_t;
 
-struct champ_info
-{
-    node_id root;
-    std::size_t size;
-
-    auto tie() const { return std::tie(root, size); }
-
-    friend bool operator==(const champ_info& left, const champ_info& right)
-    {
-        return left.tie() == right.tie();
-    }
-};
-
 template <class T>
 struct values_save
 {
@@ -187,22 +174,6 @@ void load(Archive& ar, inner_node_load<T, B>& value)
        CEREAL_NVP(datamap));
     boost::endian::big_to_native_inplace(nodemap);
     boost::endian::big_to_native_inplace(datamap);
-}
-
-template <class Archive>
-void save(Archive& ar, const champ_info& value)
-{
-    auto& root = value.root;
-    auto& size = value.size;
-    ar(CEREAL_NVP(root), CEREAL_NVP(size));
-}
-
-template <class Archive>
-void load(Archive& ar, champ_info& value)
-{
-    auto& root = value.root;
-    auto& size = value.size;
-    ar(CEREAL_NVP(root), CEREAL_NVP(size));
 }
 
 template <class Archive, class T, immer::detail::hamts::bits_t B>

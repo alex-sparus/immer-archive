@@ -454,7 +454,7 @@ TEST_CASE("Special archive loads empty test_data")
                     ],
                     "collisions": []
                 },
-                "containers": [{"key": 0, "value": {"root": 0, "size": 0}}]
+                "containers": [{"key": 0, "value": 0}]
                 },
                 "metas": {
                 "leaves": [{"key": 1, "value": []}],
@@ -529,7 +529,7 @@ TEST_CASE("Special archive throws cereal::Exception")
                     ],
                     "collisions": []
                 },
-                "containers": [{"key": 0, "value": {"root": 0, "size": 0}}]
+                "containers": [{"key": 0, "value": 0}]
                 },
                 "metas": {
                 "leaves": [{"key": 1, "value": []}],

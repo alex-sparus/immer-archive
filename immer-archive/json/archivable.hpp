@@ -7,8 +7,6 @@
 
 #include <fmt/format.h>
 
-#include <boost/hana/type.hpp>
-
 namespace immer_archive {
 
 template <class Container>
@@ -78,26 +76,13 @@ void load_minimal(const json_immer_input_archive<ImmerArchives>& ar,
                        .get_input_archives()
                        .template get_loader<Container>();
 
-    constexpr auto is_optional = boost::hana::is_valid(
-        [](auto&& x) -> decltype((void) x.has_value()) {});
-    using IsOptional = decltype(is_optional(loader.load(id)));
-
-    if constexpr (IsOptional::value) {
-        auto container = loader.load(id);
-        if (!container) {
-            throw ::cereal::Exception{fmt::format(
-                "Failed to load a container ID {} from the archive", id)};
-        }
-        value.container = std::move(*container);
-    } else {
-        try {
-            value.container = loader.load(id);
-        } catch (const archive_exception& ex) {
-            throw ::cereal::Exception{fmt::format(
-                "Failed to load a container ID {} from the archive: {}",
-                id,
-                ex.what())};
-        }
+    try {
+        value.container = loader.load(id);
+    } catch (const archive_exception& ex) {
+        throw ::cereal::Exception{
+            fmt::format("Failed to load a container ID {} from the archive: {}",
+                        id,
+                        ex.what())};
     }
 }
 

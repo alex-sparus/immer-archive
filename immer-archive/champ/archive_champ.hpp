@@ -12,10 +12,22 @@ namespace champ {
 template <class Container>
 struct container_save
 {
-    champ_info champ;
+    node_id container_id;
     // Saving the archived container, so that no mutations are allowed to
     // happen.
     Container container;
+
+    template <class Archive>
+    auto save_minimal(const Archive&) const
+    {
+        return container_id;
+    }
+
+    template <class Archive>
+    void load_minimal(const Archive&, const node_id& value)
+    {
+        container_id = value;
+    }
 };
 
 template <class Container>
@@ -35,7 +47,7 @@ struct container_archive_load
     using T       = typename champ_t::node_t::value_t;
 
     nodes_load<T, champ_t::bits> nodes;
-    immer::map<node_id, champ_info> containers;
+    immer::map<node_id, node_id> containers;
 
     auto tie() const { return std::tie(nodes, containers); }
 
@@ -50,21 +62,15 @@ template <class Container>
 container_archive_load<Container>
 to_load_archive(const container_archive_save<Container>& archive)
 {
-    auto containers = immer::map<node_id, champ_info>{};
+    auto containers = immer::map<node_id, node_id>{};
     for (const auto& [key, value] : archive.containers) {
-        containers = std::move(containers).set(key, value.champ);
+        containers = std::move(containers).set(key, value.container_id);
     }
 
     return {
         .nodes      = to_load_archive(archive.nodes),
         .containers = std::move(containers),
     };
-}
-
-template <class Archive, class... T>
-void save(Archive& ar, const container_save<T...>& value)
-{
-    save(ar, value.champ);
 }
 
 template <class Archive, class Container>

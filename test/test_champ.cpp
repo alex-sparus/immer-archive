@@ -88,13 +88,12 @@ TEST_CASE("Test saving a set")
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
         const auto loaded = loader.load(set_id);
-        REQUIRE(loaded.has_value());
         REQUIRE(into_set(set).size() == set.size());
         for (const auto& item : set) {
             // This is the only thing that actually breaks if the hash of the
             // loaded set is not the same as the hash function of the serialized
             // set.
-            REQUIRE(loaded->count(item));
+            REQUIRE(loaded.count(item));
         }
     }
 
@@ -107,8 +106,9 @@ TEST_CASE("Test saving a set")
         REQUIRE(loaded_archive.containers.size() == 1);
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
-        const auto loaded = loader.load(set_id);
-        REQUIRE(loaded.has_value() == false);
+        REQUIRE_THROWS_AS(
+            loader.load(set_id),
+            immer_archive::champ::hash_validation_failed_exception);
     }
 }
 
@@ -126,16 +126,15 @@ TEST_CASE("Test archive conversion, no json")
 
     const auto check_set = [&loader](auto id, const auto& expected) {
         const auto loaded = loader.load(id);
-        REQUIRE(loaded.has_value());
-        REQUIRE(into_set(*loaded) == into_set(expected));
+        REQUIRE(into_set(loaded) == into_set(expected));
         REQUIRE(into_set(expected).size() == expected.size());
         for (const auto& item : expected) {
             // This is the only thing that actually breaks if the hash of the
             // loaded set is not the same as the hash function of the serialized
             // set.
-            REQUIRE(loaded->count(item));
+            REQUIRE(loaded.count(item));
         }
-        for (const auto& item : *loaded) {
+        for (const auto& item : loaded) {
             REQUIRE(expected.count(item));
         }
     };
@@ -176,14 +175,13 @@ TEST_CASE("Test saving a map")
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
         const auto loaded = loader.load(map_id);
-        REQUIRE(loaded.has_value());
         REQUIRE(into_map(map).size() == map.size());
         for (const auto& [key, value] : map) {
             // This is the only thing that actually breaks if the hash of the
             // loaded map is not the same as the hash function of the serialized
             // map.
-            REQUIRE(loaded->count(key));
-            REQUIRE(loaded.value()[key] == value);
+            REQUIRE(loaded.count(key));
+            REQUIRE(loaded[key] == value);
         }
     }
 
@@ -196,8 +194,9 @@ TEST_CASE("Test saving a map")
         REQUIRE(loaded_archive.containers.size() == 1);
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
-        const auto loaded = loader.load(map_id);
-        REQUIRE(loaded.has_value() == false);
+        REQUIRE_THROWS_AS(
+            loader.load(map_id),
+            immer_archive::champ::hash_validation_failed_exception);
     }
 }
 
@@ -215,17 +214,16 @@ TEST_CASE("Test map archive conversion, no json")
 
     const auto check_map = [&loader](auto id, const auto& expected) {
         const auto loaded = loader.load(id);
-        REQUIRE(loaded.has_value());
-        REQUIRE(into_map(*loaded) == into_map(expected));
+        REQUIRE(into_map(loaded) == into_map(expected));
         REQUIRE(into_map(expected).size() == expected.size());
         for (const auto& [key, value] : expected) {
             // This is the only thing that actually breaks if the hash of the
             // loaded map is not the same as the hash function of the serialized
             // map.
-            REQUIRE(loaded->count(key));
-            REQUIRE(loaded.value()[key] == value);
+            REQUIRE(loaded.count(key));
+            REQUIRE(loaded[key] == value);
         }
-        for (const auto& [key, value] : *loaded) {
+        for (const auto& [key, value] : loaded) {
             REQUIRE(expected.count(key));
             REQUIRE(expected[key] == value);
         }
@@ -284,14 +282,12 @@ TEST_CASE("Test saving a table")
     using table_t = immer::table<test_value>;
 
     const auto verify_is_equal = [](const auto& loaded, const auto& expected) {
-        REQUIRE(loaded.has_value());
-
         for (const auto& item : expected) {
             INFO(item);
-            REQUIRE(loaded.value().count(item.id));
-            REQUIRE(loaded.value()[item.id] == item);
+            REQUIRE(loaded.count(item.id));
+            REQUIRE(loaded[item.id] == item);
         }
-        for (const auto& item : *loaded) {
+        for (const auto& item : loaded) {
             REQUIRE(expected[item.id] == item);
         }
     };
@@ -300,13 +296,17 @@ TEST_CASE("Test saving a table")
     test_table_types<table_t, table_t>(verify_is_equal);
     test_table_types<different_table_t, different_table_t>(verify_is_equal);
 
-    const auto verify_didnt_load = [](const auto& loaded,
-                                      const auto& expected) {
-        REQUIRE(loaded.has_value() == false);
+    const auto test1 = [&] {
+        test_table_types<different_table_t, table_t>(verify_is_equal);
+    };
+    const auto test2 = [&] {
+        test_table_types<table_t, different_table_t>(verify_is_equal);
     };
 
-    test_table_types<different_table_t, table_t>(verify_didnt_load);
-    test_table_types<table_t, different_table_t>(verify_didnt_load);
+    REQUIRE_THROWS_AS(test1(),
+                      immer_archive::champ::hash_validation_failed_exception);
+    REQUIRE_THROWS_AS(test2(),
+                      immer_archive::champ::hash_validation_failed_exception);
 }
 
 TEST_CASE("Test saving a table, no json")
@@ -327,12 +327,11 @@ TEST_CASE("Test saving a table, no json")
 
     const auto check = [&loader](auto id, const auto& expected) {
         const auto loaded = loader.load(id);
-        REQUIRE(loaded.has_value());
 
         for (const auto& item : expected) {
-            REQUIRE(loaded.value()[item.id] == item);
+            REQUIRE(loaded[item.id] == item);
         }
-        for (const auto& item : *loaded) {
+        for (const auto& item : loaded) {
             REQUIRE(expected[item.id] == item);
         }
     };

@@ -34,6 +34,16 @@ struct node_traits
     static constexpr auto bits = impl<Node>::bits;
 };
 
+class hash_validation_failed_exception : public archive_exception
+{
+public:
+    hash_validation_failed_exception()
+        : archive_exception{"Hash validation failed, likely different hash "
+                            "algos are used for saving and loading"}
+    {
+    }
+};
+
 template <class Container>
 class container_loader
 {
@@ -57,46 +67,43 @@ public:
     {
     }
 
-    std::optional<Container> load(node_id id)
+    Container load(node_id id)
     {
-        auto* info = archive_.containers.find(id);
-        if (!info) {
-            return std::nullopt;
+        auto* root_id = archive_.containers.find(id);
+        if (!root_id) {
+            throw archive_exception{fmt::format("Unknown container ID {}", id)};
         }
 
-        auto [root, values] = nodes_.load_inner(info->root);
-        if (!root) {
-            return std::nullopt;
-        }
+        auto [root, values]    = nodes_.load_inner(*root_id);
+        const auto items_count = [&values = values] {
+            auto count = std::size_t{};
+            for (const auto& items : values) {
+                count += items.size();
+            }
+            return count;
+        }();
 
-        auto impl = champ_t{std::move(root).release(), info->size};
+        auto impl = champ_t{std::move(root).release(), items_count};
 
         // Validate the loaded champ by ensuring that all elements can be
         // found. This verifies the hash function is the same as used while
         // saving it.
-        auto count = std::size_t{};
         for (const auto& items : values) {
             for (const auto& item : items) {
-                ++count;
                 const auto* p = impl.template get<
                     project_value_ptr,
                     immer::detail::constantly<const value_t*, nullptr>>(item);
                 if (!p) {
-                    // XXX Maybe provide an error
-                    return std::nullopt;
+                    throw hash_validation_failed_exception{};
                 }
                 if (!(*p == item)) {
-                    return std::nullopt;
+                    throw hash_validation_failed_exception{};
                 }
             }
         }
-        if (count != impl.size) {
-            return std::nullopt;
-        }
 
         // XXX This ctor is not public in immer.
-        auto container = Container{std::move(impl)};
-        return container;
+        return impl;
     }
 
 private:
@@ -129,12 +136,8 @@ save_to_archive(Container container, container_archive_save<Container> archive)
     archive.containers = std::move(archive.containers)
                              .set(root_id,
                                   container_save<Container>{
-                                      .champ =
-                                          champ_info{
-                                              .root = root_id,
-                                              .size = impl.size,
-                                          },
-                                      .container = std::move(container),
+                                      .container_id = root_id,
+                                      .container    = std::move(container),
                                   });
 
     return {std::move(archive), root_id};
