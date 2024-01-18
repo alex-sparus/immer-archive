@@ -9,6 +9,7 @@
   boost,
   nlohmann_json,
   immer,
+  xxHash,
   lib,
   build-tests ? false,
 }:
@@ -27,6 +28,7 @@ stdenv.mkDerivation rec {
     boost
     nlohmann_json
     immer
+    xxHash
   ];
 
   doCheck = true;

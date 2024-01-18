@@ -98,16 +98,15 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
             for (const auto& [index, set_id] : ids) {
                 const auto& set   = vars[index];
                 const auto loaded = loader.load(set_id);
-                assert(loaded.has_value());
-                assert(into_set(*loaded) == into_set(set));
+                assert(into_set(loaded) == into_set(set));
                 assert(into_set(set).size() == set.size());
                 for (const auto& item : set) {
                     // This is the only thing that actually breaks if the hash
                     // of the loaded set is not the same as the hash function of
                     // the serialized set.
-                    assert(loaded->count(item));
+                    assert(loaded.count(item));
                 }
-                for (const auto& item : *loaded) {
+                for (const auto& item : loaded) {
                     assert(set.count(item));
                 }
             }
