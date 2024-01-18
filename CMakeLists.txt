@@ -13,6 +13,7 @@ option(BUILD_TESTS "enable tests" yes)
 
 find_package(spdlog REQUIRED)
 find_package(cereal REQUIRED)
+find_package(xxHash 0.8 CONFIG REQUIRED)
 
 if(BUILD_TESTS)
   enable_testing()

@@ -71,6 +71,7 @@
             boost
             nlohmann_json
             immer.defaultPackage.${system}
+            xxHash
 
             # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
             our_llvm.bintools-unwrapped

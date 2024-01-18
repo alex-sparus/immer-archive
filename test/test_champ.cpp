@@ -4,6 +4,8 @@
 
 #include "utils.hpp"
 
+#include <xxhash.h>
+
 using namespace test;
 
 namespace {
@@ -109,6 +111,51 @@ TEST_CASE("Test saving a set")
         REQUIRE_THROWS_AS(
             loader.load(set_id),
             immer_archive::champ::hash_validation_failed_exception);
+    }
+}
+
+namespace {
+struct xx_hash_64
+{
+    template <class T, class U>
+    using enable_for = std::enable_if_t<std::is_same_v<T, U>, std::size_t>;
+
+    static_assert(sizeof(std::size_t) == 8); // 64 bits
+    static_assert(sizeof(XXH64_hash_t) == sizeof(std::size_t));
+
+    template <class T>
+    enable_for<T, std::string> operator()(const T& str) const
+    {
+        return XXH3_64bits(str.c_str(), str.size());
+    }
+};
+} // namespace
+
+TEST_CASE("Test set with xxHash")
+{
+    using Container = immer::set<std::string, xx_hash_64>;
+
+    const auto set          = gen_set(Container{}, 200);
+    const auto [ar, set_id] = immer_archive::champ::save_to_archive(set, {});
+    const auto ar_str       = to_json(ar);
+    // REQUIRE(ar_str == "");
+
+    SECTION("Load with the correct hash")
+    {
+        const auto loaded_archive =
+            from_json<immer_archive::champ::container_archive_load<Container>>(
+                ar_str);
+        REQUIRE(loaded_archive.containers.size() == 1);
+
+        auto loader = immer_archive::champ::container_loader{loaded_archive};
+        const auto loaded = loader.load(set_id);
+        REQUIRE(into_set(set).size() == set.size());
+        for (const auto& item : set) {
+            // This is the only thing that actually breaks if the hash of the
+            // loaded set is not the same as the hash function of the serialized
+            // set.
+            REQUIRE(loaded.count(item));
+        }
     }
 }
 
