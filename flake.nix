@@ -109,7 +109,12 @@
         immer-archive = pkgs.callPackage ./derivation.nix {
           stdenv = our_llvm.stdenv;
           immer = immer.defaultPackage.${system};
+          build-with-sanitizer = false;
           inherit arximboldi-cereal;
+        };
+        immer-archive-asan = immer-archive.override {
+          build-tests = true;
+          build-with-sanitizer = true;
         };
         debug-tests =
           (immer-archive.override {build-tests = true;})
@@ -119,8 +124,15 @@
           });
       in
         {
-          inherit immer-archive debug-tests;
+          inherit immer-archive debug-tests immer-archive-asan;
           default = immer-archive;
+
+          run-fuzz-flex-vector = pkgs.writeShellApplication {
+            name = "runner";
+            text = ''
+              ${immer-archive-asan}/bin/fuzz/flex-vector
+            '';
+          };
         }
         // (
           if pkgs.stdenv.isLinux

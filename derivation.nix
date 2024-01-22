@@ -12,6 +12,7 @@
   xxHash,
   lib,
   build-tests ? false,
+  build-with-sanitizer,
 }:
 stdenv.mkDerivation rec {
   pname = "immer-archive";
@@ -37,7 +38,11 @@ stdenv.mkDerivation rec {
 
   # Currently, the code has a memory leak
   cmakeFlags = [
-    "-DTESTS_WITH_LEAK_SANITIZER=OFF"
+    "-DTESTS_WITH_LEAK_SANITIZER=${
+      if build-with-sanitizer
+      then "ON"
+      else "OFF"
+    }"
     "-DBUILD_TESTS=${
       if build-tests
       then "ON"

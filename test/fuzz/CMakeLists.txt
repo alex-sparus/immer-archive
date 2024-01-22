@@ -20,6 +20,7 @@ function(add_fuzzer bin_name file)
             -Wno-unused-variable
             # -Wno-nullability-extension -Wno-deprecated-declarations
   )
+  install(TARGETS ${bin_name} DESTINATION bin/fuzz)
 endfunction()
 
 add_fuzzer(fuzz_set fuzz_set.cpp)
