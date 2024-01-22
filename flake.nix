@@ -78,7 +78,7 @@
         };
       };
 
-      devShell = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
+      devShells.default = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
         NIX_HARDENING_ENABLE = "";
         inherit (self.checks.${system}.pre-commit-check) shellHook;
         packages = with pkgs;

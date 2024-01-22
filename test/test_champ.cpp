@@ -1,10 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <immer-archive/champ/champ.hpp>
+#include <immer-archive/xxhash/xxhash.hpp>
 
 #include "utils.hpp"
-
-#include <xxhash.h>
 
 using namespace test;
 
@@ -114,26 +113,10 @@ TEST_CASE("Test saving a set")
     }
 }
 
-namespace {
-struct xx_hash_64
-{
-    template <class T, class U>
-    using enable_for = std::enable_if_t<std::is_same_v<T, U>, std::size_t>;
-
-    static_assert(sizeof(std::size_t) == 8); // 64 bits
-    static_assert(sizeof(XXH64_hash_t) == sizeof(std::size_t));
-
-    template <class T>
-    enable_for<T, std::string> operator()(const T& str) const
-    {
-        return XXH3_64bits(str.c_str(), str.size());
-    }
-};
-} // namespace
-
 TEST_CASE("Test set with xxHash")
 {
-    using Container = immer::set<std::string, xx_hash_64>;
+    using Container =
+        immer::set<std::string, immer_archive::xx_hash<std::string>>;
 
     const auto set          = gen_set(Container{}, 200);
     const auto [ar, set_id] = immer_archive::champ::save_to_archive(set, {});

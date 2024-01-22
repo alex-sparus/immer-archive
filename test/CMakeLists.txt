@@ -1,5 +1,6 @@
-add_executable(tests test_vectors.cpp test_special_archive.cpp test_champ.cpp
-                     test_includes.cpp)
+add_executable(
+  tests test_vectors.cpp test_special_archive.cpp test_champ.cpp
+        test_includes.cpp test_xxhash.cpp ../immer-archive/xxhash/xxhash_64.cpp)
 target_include_directories(tests PRIVATE ../)
 target_link_libraries(tests PRIVATE spdlog::spdlog Catch2::Catch2WithMain
                                     xxHash::xxhash)
