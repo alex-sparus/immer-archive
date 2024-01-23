@@ -38,6 +38,7 @@
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      pkgs' = pkgs.pkgsCross.mips64-linux-gnuabi64;
       clang-format = pkgs.runCommand "clang-format" {} ''
         mkdir -p $out/bin
         ln -s ${pkgs.llvmPackages_16.clang-unwrapped}/bin/clang-format $out/bin/
@@ -78,46 +79,18 @@
         };
       };
 
-      devShells.default = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
-        NIX_HARDENING_ENABLE = "";
-        packages = with pkgs;
-          [
-            # Tools
-            clang-format
-            cmake-format
-            just
-            fzf
-            # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
-            our_llvm.bintools-unwrapped
+      test = pkgs;
 
-            # Build-time
-            cmake
-            ninja
-
-            # Dependencies
-            spdlog
-            arximboldi-cereal
-            fmt_9
-            catch2_3
-            boost
-            nlohmann_json
-            immer.defaultPackage.${system}
-            xxHash
-          ]
-          ++ lib.optionals stdenv.isLinux [
-            valgrind
-            lldb
-          ];
-
-        shellHook =
-          self.checks.${system}.pre-commit-check.shellHook
-          + "\n"
-          + ''
-            source just.bash
-            complete -F _just -o bashdefault -o default j
-            alias j=just
-          '';
+      devShells.default = pkgs.callPackage ./dev-shell.nix {
+        inherit arximboldi-cereal clang-format our_llvm;
+        inherit (self.checks.${system}) pre-commit-check;
+        immer = immer.defaultPackage.${system};
       };
+      # devShells.default = pkgs'.callPackage ./dev-shell.nix {
+      #   inherit arximboldi-cereal clang-format our_llvm;
+      #   inherit (self.checks.${system}) pre-commit-check;
+      #   immer = immer.defaultPackage.${system};
+      # };
 
       packages = let
         immer-archive = pkgs.callPackage ./derivation.nix {
