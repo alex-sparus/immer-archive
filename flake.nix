@@ -156,7 +156,7 @@
               name = "runner";
               runtimeInputs = [pkgs.valgrind];
               text = ''
-                valgrind --suppressions=${debug-tests}/bin/valgrind.supp ${debug-tests}/bin/tests '~[valgrind]'
+                valgrind --suppressions=${debug-tests}/bin/valgrind.supp ${debug-tests}/bin/tests
               '';
             };
 
@@ -164,7 +164,7 @@
               name = "runner";
               runtimeInputs = [pkgs.valgrind];
               text = ''
-                valgrind ${debug-tests}/bin/tests '[valgrind]'
+                valgrind ${debug-tests}/bin/tests '[broken]'
               '';
             };
           }

@@ -1467,7 +1467,7 @@ TEST_CASE("Test flex vector with a weird shape relaxed")
     REQUIRE(loaded == expected);
 }
 
-TEST_CASE("Test flex vector with a weird shape strict", "[valgrind]")
+TEST_CASE("Test flex vector with a weird shape strict", "[.broken]")
 {
     json_t data;
     data["value0"]["leaves"] = {
