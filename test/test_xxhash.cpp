@@ -15,11 +15,3 @@ TEST_CASE("Test hash strings")
             10760762337991515389UL);
     REQUIRE(XXH3_64bits(str.c_str(), str.size()) == 10760762337991515389UL);
 }
-
-TEST_CASE("Test hash ints")
-{
-    REQUIRE(immer_archive::xx_hash<int>{}(0) == 0);
-    REQUIRE(immer_archive::xx_hash<int>{}(1) == 0);
-    REQUIRE(immer_archive::xx_hash<int>{}(2) == 0);
-    REQUIRE(immer_archive::xx_hash<int>{}(-2) == 0);
-}

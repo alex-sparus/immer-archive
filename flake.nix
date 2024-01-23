@@ -80,13 +80,21 @@
 
       devShells.default = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
         NIX_HARDENING_ENABLE = "";
-        inherit (self.checks.${system}.pre-commit-check) shellHook;
         packages = with pkgs;
           [
+            # Tools
             clang-format
             cmake-format
+            just
+            fzf
+            # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
+            our_llvm.bintools-unwrapped
+
+            # Build-time
             cmake
             ninja
+
+            # Dependencies
             spdlog
             arximboldi-cereal
             fmt_9
@@ -95,14 +103,20 @@
             nlohmann_json
             immer.defaultPackage.${system}
             xxHash
-
-            # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
-            our_llvm.bintools-unwrapped
           ]
           ++ lib.optionals stdenv.isLinux [
             valgrind
             lldb
           ];
+
+        shellHook =
+          self.checks.${system}.pre-commit-check.shellHook
+          + "\n"
+          + ''
+            source just.bash
+            complete -F _just -o bashdefault -o default j
+            alias j=just
+          '';
       };
 
       packages = let
