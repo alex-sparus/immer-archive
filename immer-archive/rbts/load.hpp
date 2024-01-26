@@ -85,12 +85,11 @@ template <class T,
 class loader
 {
 public:
-    using rbtree         = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
-    using rrbtree        = immer::detail::rbts::rrbtree<T, MemoryPolicy, B, BL>;
-    using node_t         = typename rbtree::node_t;
-    using node_ptr       = node_ptr<node_t>;
-    using inner_node_ptr = inner_node_ptr<node_t>;
-    using nodes_set_t    = immer::set<node_id>;
+    using rbtree      = immer::detail::rbts::rbtree<T, MemoryPolicy, B, BL>;
+    using rrbtree     = immer::detail::rbts::rrbtree<T, MemoryPolicy, B, BL>;
+    using node_t      = typename rbtree::node_t;
+    using node_ptr    = node_ptr<node_t>;
+    using nodes_set_t = immer::set<node_id>;
 
     explicit loader(archive_load<T> ar)
         : ar_{std::move(ar)}

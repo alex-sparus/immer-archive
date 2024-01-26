@@ -120,10 +120,4 @@ private:
     ptr_with_deleter<Node> ptr;
 };
 
-template <typename Node>
-struct inner_node_ptr
-{
-    node_ptr<Node> node;
-};
-
 } // namespace immer_archive
