@@ -749,16 +749,13 @@ TEST_CASE("Test loading a big map saved on macOS with std::hash", "[.macos]")
     const auto actual        = nlohmann::json::parse(ar_str);
     REQUIRE(expected == actual);
 
-    SECTION("Load with the correct hash")
-    {
-        const auto loaded_archive = test::from_json<
-            immer_archive::champ::container_archive_load<Container>>(ar_str);
-        REQUIRE(loaded_archive.containers.size() == 1);
+    const auto loaded_archive = test::from_json<
+        immer_archive::champ::container_archive_load<Container>>(ar_str);
+    REQUIRE(loaded_archive.containers.size() == 1);
 
-        auto loader = immer_archive::champ::container_loader{loaded_archive};
-        const auto loaded = loader.load(set_id);
-        REQUIRE(loaded == set);
-    }
+    auto loader       = immer_archive::champ::container_loader{loaded_archive};
+    const auto loaded = loader.load(set_id);
+    REQUIRE(loaded == set);
 }
 
 TEST_CASE("Test loading a big map with xxHash")
@@ -1531,14 +1528,11 @@ TEST_CASE("Test loading a big map with xxHash")
     const auto actual   = nlohmann::json::parse(ar_str);
     REQUIRE(expected == actual);
 
-    SECTION("Load with the correct hash")
-    {
-        const auto loaded_archive = test::from_json<
-            immer_archive::champ::container_archive_load<Container>>(ar_str);
-        REQUIRE(loaded_archive.containers.size() == 1);
+    const auto loaded_archive = test::from_json<
+        immer_archive::champ::container_archive_load<Container>>(ar_str);
+    REQUIRE(loaded_archive.containers.size() == 1);
 
-        auto loader = immer_archive::champ::container_loader{loaded_archive};
-        const auto loaded = loader.load(set_id);
-        REQUIRE(loaded == set);
-    }
+    auto loader       = immer_archive::champ::container_loader{loaded_archive};
+    const auto loaded = loader.load(set_id);
+    REQUIRE(loaded == set);
 }
