@@ -12,7 +12,7 @@ namespace champ {
 template <class Container>
 struct container_save
 {
-    node_id container_id;
+    node_id root_id;
     // Saving the archived container, so that no mutations are allowed to
     // happen.
     Container container;
@@ -20,13 +20,13 @@ struct container_save
     template <class Archive>
     auto save_minimal(const Archive&) const
     {
-        return container_id;
+        return root_id;
     }
 
     template <class Archive>
     void load_minimal(const Archive&, const node_id& value)
     {
-        container_id = value;
+        root_id = value;
     }
 };
 
@@ -64,7 +64,7 @@ to_load_archive(const container_archive_save<Container>& archive)
 {
     auto containers = immer::map<node_id, node_id>{};
     for (const auto& [key, value] : archive.containers) {
-        containers = std::move(containers).set(key, value.container_id);
+        containers = std::move(containers).set(key, value.root_id);
     }
 
     return {

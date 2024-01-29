@@ -133,11 +133,14 @@ save_to_archive(Container container, container_archive_save<Container> archive)
     archive.nodes = save_nodes(impl, std::move(archive.nodes));
     assert(archive.nodes.inners.count(root_id));
 
+    const auto container_id = archive.containers.size();
+    assert(archive.containers.count(container_id) == 0);
+
     archive.containers = std::move(archive.containers)
-                             .set(root_id,
+                             .set(container_id,
                                   container_save<Container>{
-                                      .container_id = root_id,
-                                      .container    = std::move(container),
+                                      .root_id   = root_id,
+                                      .container = std::move(container),
                                   });
 
     return {std::move(archive), root_id};

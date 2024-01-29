@@ -378,9 +378,14 @@ TEST_CASE("Test modifying set nodes")
     using Container =
         immer::set<std::string, immer_archive::xx_hash<std::string>>;
 
-    // const auto set = gen_set(Container{}, 30);
-    // const auto [ar, set_id] = immer_archive::champ::save_to_archive(set, {});
-    // const auto ar_str       = to_json(ar);
+    const auto expected_set  = gen_set(Container{}, 30);
+    const auto expected_set2 = expected_set.insert("thirty");
+
+    // auto [ar, set_id] = immer_archive::champ::save_to_archive(set, {});
+    // auto set2_id      = immer_archive::champ::node_id{};
+    // std::tie(ar, set2_id) =
+    //     immer_archive::champ::save_to_archive(set2, std::move(ar));
+    // const auto ar_str = to_json(ar);
     // REQUIRE(ar_str == "");
 
     auto data = json_t::parse(R"({
@@ -494,26 +499,35 @@ TEST_CASE("Test modifying set nodes")
             "nodemap": 0,
             "datamap": 268451840
           }
+        },
+        {
+          "key": 12,
+          "value": {
+            "values": ["15", "27", "6", "0", "1", "thirty", "20", "4"],
+            "children": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            "nodemap": 1343560972,
+            "datamap": 19407011
+          }
         }
       ],
       "collisions": []
     },
-    "containers": [{"key": 0, "value": 0}]
+    "containers": [{"key": 0, "value": 0}, {"key": 1, "value": 12}]
   }
 })");
 
-    const auto load_set = [&] {
+    const auto load_set = [&data](auto id) {
         const auto loaded_archive =
             from_json<immer_archive::champ::container_archive_load<Container>>(
                 data.dump());
         auto loader = immer_archive::champ::container_loader{loaded_archive};
-        return loader.load(0);
+        return loader.load(id);
     };
 
     SECTION("Loads correctly")
     {
-        const auto set = gen_set(Container{}, 30);
-        REQUIRE(load_set() == set);
+        REQUIRE(load_set(0) == expected_set);
+        REQUIRE(load_set(1) == expected_set2);
     }
     SECTION("Modify nodemap of node 0")
     {
@@ -522,8 +536,10 @@ TEST_CASE("Test modifying set nodes")
         REQUIRE(nodemap == 1343560972);
         nodemap = 1343560971;
         REQUIRE_THROWS_AS(
-            load_set(),
+            load_set(0),
             immer_archive::champ::children_count_corrupted_exception);
+        // Node 0 doesn't affect the second set
+        REQUIRE(load_set(1) == expected_set2);
     }
     SECTION("Modify datamap of node 0")
     {
@@ -531,8 +547,10 @@ TEST_CASE("Test modifying set nodes")
             data["value0"]["nodes"]["inners"][0]["value"]["datamap"];
         REQUIRE(datamap == 19407009);
         datamap = 19407008;
-        REQUIRE_THROWS_AS(load_set(),
+        REQUIRE_THROWS_AS(load_set(0),
                           immer_archive::champ::data_count_corrupted_exception);
+        // Node 0 doesn't affect the second set
+        REQUIRE(load_set(1) == expected_set2);
     }
     SECTION("Modify nodemap of node 1")
     {
@@ -541,7 +559,10 @@ TEST_CASE("Test modifying set nodes")
         REQUIRE(nodemap == 0);
         nodemap = 1;
         REQUIRE_THROWS_AS(
-            load_set(),
+            load_set(0),
+            immer_archive::champ::children_count_corrupted_exception);
+        REQUIRE_THROWS_AS(
+            load_set(1),
             immer_archive::champ::children_count_corrupted_exception);
     }
     SECTION("Modify datamap of node 1")
@@ -550,7 +571,52 @@ TEST_CASE("Test modifying set nodes")
             data["value0"]["nodes"]["inners"][1]["value"]["datamap"];
         REQUIRE(datamap == 536875008);
         datamap = 536875007;
-        REQUIRE_THROWS_AS(load_set(),
+        REQUIRE_THROWS_AS(load_set(0),
                           immer_archive::champ::data_count_corrupted_exception);
+        REQUIRE_THROWS_AS(load_set(1),
+                          immer_archive::champ::data_count_corrupted_exception);
+    }
+    SECTION("Corrupt datamap but keep the same popcount")
+    {
+        auto& datamap =
+            data["value0"]["nodes"]["inners"][2]["value"]["datamap"];
+        REQUIRE(datamap == 16777224);
+        datamap = 536875008; // This number also has 2 bits set
+        REQUIRE_THROWS_AS(
+            load_set(0),
+            immer_archive::champ::hash_validation_failed_exception);
+        REQUIRE_THROWS_AS(
+            load_set(1),
+            immer_archive::champ::hash_validation_failed_exception);
+    }
+    SECTION("Corrupt nodemap but keep the same popcount")
+    {
+        auto& nodemap =
+            data["value0"]["nodes"]["inners"][0]["value"]["nodemap"];
+        REQUIRE(nodemap == 1343560972);
+        nodemap = 1343560460; // This number has the same number of bits set
+        REQUIRE_THROWS_AS(
+            load_set(0),
+            immer_archive::champ::hash_validation_failed_exception);
+        // Node 0 doesn't affect the second set
+        REQUIRE(load_set(1) == expected_set2);
+    }
+    SECTION("Missing a child node")
+    {
+        auto& key = data["value0"]["nodes"]["inners"][2]["key"];
+        REQUIRE(key == 2);
+        key = 92;
+        REQUIRE_THROWS_AS(load_set(0), immer_archive::invalid_node_id);
+        REQUIRE_THROWS_AS(load_set(1), immer_archive::invalid_node_id);
+    }
+    SECTION("Same identity")
+    {
+        // Have to keep the loader alive between loads, otherwise there's no way
+        // to share the nodes.
+        const auto loaded_archive =
+            from_json<immer_archive::champ::container_archive_load<Container>>(
+                data.dump());
+        auto loader = immer_archive::champ::container_loader{loaded_archive};
+        REQUIRE(loader.load(0).identity() == loader.load(0).identity());
     }
 }
