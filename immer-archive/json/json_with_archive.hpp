@@ -217,6 +217,12 @@ T from_json_with_archive(const std::string& input)
             auto is = std::istringstream{input};
             auto ar =
                 immer_archive::json_immer_input_archive<Archives>{archives, is};
+            /**
+             * NOTE: Critical to clear the archives before loading into it
+             * again. I hit a bug when archives contained a vector and every
+             * load would append to it, instead of replacing the contents.
+             */
+            archives = {};
             ar(CEREAL_NVP(archives));
         };
 

@@ -64,15 +64,17 @@ struct nodes_archive_builder
     void visit_collision(const auto* node)
     {
         auto id = get_node_id(node);
-        if (ar.collisions.count(id)) {
+        if (ar.inners.count(id)) {
             return;
         }
 
-        auto info = values_save<T>{
-            .begin = node->collisions(),
-            .end   = node->collisions() + node->collision_count(),
-        };
-        ar.collisions = std::move(ar.collisions).set(id, std::move(info));
+        ar.inners = std::move(ar.inners).set(
+            id,
+            inner_node_save<T, B>{
+                .values     = {node->collisions(),
+                               node->collisions() + node->collision_count()},
+                .collisions = true,
+            });
     }
 
     void visit(const auto* node, immer::detail::hamts::count_t depth)

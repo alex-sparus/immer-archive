@@ -76,19 +76,20 @@ public:
             return *p;
         }
 
-        auto* node_info = archive_.collisions.find(id);
-        if (!node_info) {
+        if (id >= archive_.inners.size()) {
             throw invalid_node_id{id};
         }
 
-        const auto n = node_info->data.size();
+        const auto& node_info = archive_.inners[id];
+
+        const auto n = node_info.values.data.size();
         auto node    = node_ptr{node_t::make_collision_n(n),
                              [](auto* ptr) { node_t::delete_collision(ptr); }};
-        immer::detail::uninitialized_copy(node_info->data.begin(),
-                                          node_info->data.end(),
+        immer::detail::uninitialized_copy(node_info.values.data.begin(),
+                                          node_info.values.data.end(),
                                           node.get()->collisions());
         auto result =
-            std::make_pair(std::move(node), values_t{node_info->data});
+            std::make_pair(std::move(node), values_t{node_info.values.data});
         collisions_ = std::move(collisions_).set(id, result);
         return result;
     }
@@ -99,30 +100,31 @@ public:
             return *p;
         }
 
-        auto* node_info = archive_.inners.find(id);
-        if (!node_info) {
+        if (id >= archive_.inners.size()) {
             throw invalid_node_id{id};
         }
 
-        const auto children_count = node_info->children.size();
-        const auto values_count   = node_info->values.data.size();
+        const auto& node_info = archive_.inners[id];
+
+        const auto children_count = node_info.children.size();
+        const auto values_count   = node_info.values.data.size();
 
         // Loading validation
         {
             const auto expected_count =
-                immer::detail::hamts::popcount(node_info->nodemap);
+                immer::detail::hamts::popcount(node_info.nodemap);
             if (expected_count != children_count) {
                 throw children_count_corrupted_exception{
-                    id, node_info->nodemap, expected_count, children_count};
+                    id, node_info.nodemap, expected_count, children_count};
             }
         }
 
         {
             const auto expected_count =
-                immer::detail::hamts::popcount(node_info->datamap);
+                immer::detail::hamts::popcount(node_info.datamap);
             if (expected_count != values_count) {
                 throw data_count_corrupted_exception{
-                    id, node_info->datamap, expected_count, values_count};
+                    id, node_info.datamap, expected_count, values_count};
             }
         }
 
@@ -131,7 +133,7 @@ public:
         // Load children
         const auto children = [&values, &node_info, this] {
             auto [children_ptrs, children_values] =
-                load_children(node_info->children);
+                load_children(node_info.children);
 
             if (!children_values.empty()) {
                 values = std::move(values) + children_values;
@@ -160,15 +162,15 @@ public:
                          node_t::delete_inner(ptr);
                          delete_children();
                      }};
-        inner.get()->impl.d.data.inner.nodemap = node_info->nodemap;
-        inner.get()->impl.d.data.inner.datamap = node_info->datamap;
+        inner.get()->impl.d.data.inner.nodemap = node_info.nodemap;
+        inner.get()->impl.d.data.inner.datamap = node_info.datamap;
 
         // Values
         if (values_count) {
-            immer::detail::uninitialized_copy(node_info->values.data.begin(),
-                                              node_info->values.data.end(),
+            immer::detail::uninitialized_copy(node_info.values.data.begin(),
+                                              node_info.values.data.end(),
                                               inner.get()->values());
-            values = std::move(values).push_back(node_info->values.data);
+            values = std::move(values).push_back(node_info.values.data);
         }
 
         // Set children
@@ -183,13 +185,15 @@ public:
 
     std::pair<node_ptr, values_t> load_some_node(node_id id)
     {
-        if (archive_.inners.count(id)) {
+        if (id >= archive_.inners.size()) {
+            throw invalid_node_id{id};
+        }
+
+        if (archive_.inners[id].collisions) {
+            return load_collision(id);
+        } else {
             return load_inner(id);
         }
-        if (archive_.collisions.count(id)) {
-            return load_collision(id);
-        }
-        throw invalid_node_id{id};
     }
 
     std::pair<std::vector<node_ptr>, values_t>

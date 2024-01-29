@@ -415,65 +415,58 @@ TEST_CASE("Special archive loads empty test_data")
     //     immer_archive::to_json_with_archive(value).first;
     // REQUIRE(json_archive_str == "");
 
-    const auto json_archive_str = R"(
-        {
-            "value0": {
-                "ints": 0,
-                "strings": 0,
-                "flex_ints": 0,
-                "map": 0,
-                "metas": 0,
-                "single_meta": {"ints": 0, "metas": 0}
-            },
-            "archives": {
-                "ints": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-                "flex_vectors": []
-                },
-                "strings": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-                "flex_vectors": []
-                },
-                "flex_ints": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [],
-                "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
-                },
-                "int_string_map": {
-                "nodes": {
-                    "inners": [
-                    {
-                        "key": 0,
-                        "value": {"values": [], "children": [], "nodemap": 0, "datamap": 0}
-                    }
-                    ],
-                    "collisions": []
-                },
-                "containers": [{"key": 0, "value": 0}]
-                },
-                "metas": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-                "flex_vectors": []
-                },
-                "meta_metas": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-                "flex_vectors": []
-                },
-                "table_test_value": {
-                "nodes": {"inners": [], "collisions": []},
-                "containers": []
-                }
-            }
-            })";
+    const auto json_archive_str = R"({
+  "value0": {
+    "ints": 0,
+    "strings": 0,
+    "flex_ints": 0,
+    "map": 0,
+    "metas": 0,
+    "single_meta": {"ints": 0, "metas": 0}
+  },
+  "archives": {
+    "ints": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
+      "flex_vectors": []
+    },
+    "strings": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
+      "flex_vectors": []
+    },
+    "flex_ints": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [],
+      "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}]
+    },
+    "int_string_map": {
+      "nodes": [
+          {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
+      ],
+      "containers": [{"key": 0, "value": 0}]
+    },
+    "metas": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
+      "flex_vectors": []
+    },
+    "meta_metas": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
+      "flex_vectors": []
+    },
+    "table_test_value": {
+      "nodes": [],
+      "containers": []
+    }
+  }
+})";
 
     {
         auto loaded = immer_archive::from_json_with_archive<
@@ -490,65 +483,58 @@ TEST_CASE("Special archive throws cereal::Exception")
     //     immer_archive::to_json_with_archive(value).first;
     // REQUIRE(json_archive_str == "");
 
-    const auto json_archive_str = R"(
-        {
-            "value0": {
-                "ints": 99,
-                "strings": 0,
-                "flex_ints": 0,
-                "map": 0,
-                "metas": 0,
-                "single_meta": {"ints": 0, "metas": 0}
-            },
-            "archives": {
-                "ints": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-                "flex_vectors": []
-                },
-                "strings": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-                "flex_vectors": []
-                },
-                "flex_ints": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [],
-                "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
-                },
-                "int_string_map": {
-                "nodes": {
-                    "inners": [
-                    {
-                        "key": 0,
-                        "value": {"values": [], "children": [], "nodemap": 0, "datamap": 0}
-                    }
-                    ],
-                    "collisions": []
-                },
-                "containers": [{"key": 0, "value": 0}]
-                },
-                "metas": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-                "flex_vectors": []
-                },
-                "meta_metas": {
-                "leaves": [{"key": 1, "value": []}],
-                "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-                "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-                "flex_vectors": []
-                },
-                "table_test_value": {
-                "nodes": {"inners": [], "collisions": []},
-                "containers": []
-                }
-            }
-            })";
+    const auto json_archive_str = R"({
+  "value0": {
+    "ints": 99,
+    "strings": 0,
+    "flex_ints": 0,
+    "map": 0,
+    "metas": 0,
+    "single_meta": {"ints": 0, "metas": 0}
+  },
+  "archives": {
+    "ints": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+      "flex_vectors": []
+    },
+    "strings": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+      "flex_vectors": []
+    },
+    "flex_ints": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [],
+      "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
+    },
+    "int_string_map": {
+      "nodes": [
+            {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
+        ],
+      "containers": [{"key": 0, "value": 0}]
+    },
+    "metas": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+      "flex_vectors": []
+    },
+    "meta_metas": {
+      "leaves": [{"key": 1, "value": []}],
+      "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
+      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
+      "flex_vectors": []
+    },
+    "table_test_value": {
+      "nodes": [],
+      "containers": []
+    }
+  }
+})";
 
     REQUIRE_THROWS_MATCHES(
         immer_archive::from_json_with_archive<test_data>(json_archive_str),

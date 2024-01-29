@@ -381,137 +381,108 @@ TEST_CASE("Test modifying set nodes")
     const auto expected_set  = gen_set(Container{}, 30);
     const auto expected_set2 = expected_set.insert("thirty");
 
-    // auto [ar, set_id] = immer_archive::champ::save_to_archive(set, {});
-    // auto set2_id      = immer_archive::champ::node_id{};
-    // std::tie(ar, set2_id) =
-    //     immer_archive::champ::save_to_archive(set2, std::move(ar));
+    // auto [ar, set_id] = immer_archive::champ::save_to_archive(expected_set,
+    // {}); auto set2_id      = immer_archive::champ::node_id{}; std::tie(ar,
+    // set2_id) =
+    //     immer_archive::champ::save_to_archive(expected_set2, std::move(ar));
     // const auto ar_str = to_json(ar);
     // REQUIRE(ar_str == "");
 
     auto data = json_t::parse(R"({
   "value0": {
-    "nodes": {
-      "inners": [
-        {
-          "key": 0,
-          "value": {
-            "values": ["15", "27", "6", "0", "1", "20", "4"],
-            "children": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-            "nodemap": 1343560972,
-            "datamap": 19407009
-          }
-        },
-        {
-          "key": 1,
-          "value": {
-            "values": ["25", "24"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 536875008
-          }
-        },
-        {
-          "key": 2,
-          "value": {
-            "values": ["14", "16"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 16777224
-          }
-        },
-        {
-          "key": 3,
-          "value": {
-            "values": ["23", "26", "9"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 2147747840
-          }
-        },
-        {
-          "key": 4,
-          "value": {
-            "values": ["13", "8"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 16512
-          }
-        },
-        {
-          "key": 5,
-          "value": {
-            "values": ["28", "22"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 8388640
-          }
-        },
-        {
-          "key": 6,
-          "value": {
-            "values": ["3", "19"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 2147485696
-          }
-        },
-        {
-          "key": 7,
-          "value": {
-            "values": ["10", "5"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 33556480
-          }
-        },
-        {
-          "key": 8,
-          "value": {
-            "values": ["29", "18"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 16778240
-          }
-        },
-        {
-          "key": 9,
-          "value": {
-            "values": ["2", "12"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 9
-          }
-        },
-        {
-          "key": 10,
-          "value": {
-            "values": ["7", "11"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 8388616
-          }
-        },
-        {
-          "key": 11,
-          "value": {
-            "values": ["21", "17"],
-            "children": [],
-            "nodemap": 0,
-            "datamap": 268451840
-          }
-        },
-        {
-          "key": 12,
-          "value": {
-            "values": ["15", "27", "6", "0", "1", "thirty", "20", "4"],
-            "children": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-            "nodemap": 1343560972,
-            "datamap": 19407011
-          }
-        }
-      ],
-      "collisions": []
-    },
+    "nodes": [
+      {
+        "values": ["15", "27", "6", "0", "1", "20", "4"],
+        "children": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        "nodemap": 1343560972,
+        "datamap": 19407009,
+        "collisions": false
+      },
+      {
+        "values": ["25", "24"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 536875008,
+        "collisions": false
+      },
+      {
+        "values": ["14", "16"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 16777224,
+        "collisions": false
+      },
+      {
+        "values": ["23", "26", "9"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 2147747840,
+        "collisions": false
+      },
+      {
+        "values": ["13", "8"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 16512,
+        "collisions": false
+      },
+      {
+        "values": ["28", "22"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 8388640,
+        "collisions": false
+      },
+      {
+        "values": ["3", "19"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 2147485696,
+        "collisions": false
+      },
+      {
+        "values": ["10", "5"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 33556480,
+        "collisions": false
+      },
+      {
+        "values": ["29", "18"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 16778240,
+        "collisions": false
+      },
+      {
+        "values": ["2", "12"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 9,
+        "collisions": false
+      },
+      {
+        "values": ["7", "11"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 8388616,
+        "collisions": false
+      },
+      {
+        "values": ["21", "17"],
+        "children": [],
+        "nodemap": 0,
+        "datamap": 268451840,
+        "collisions": false
+      },
+      {
+        "values": ["15", "27", "6", "0", "1", "thirty", "20", "4"],
+        "children": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        "nodemap": 1343560972,
+        "datamap": 19407011,
+        "collisions": false
+      }
+    ],
     "containers": [{"key": 0, "value": 0}, {"key": 1, "value": 12}]
   }
 })");
@@ -531,8 +502,7 @@ TEST_CASE("Test modifying set nodes")
     }
     SECTION("Modify nodemap of node 0")
     {
-        auto& nodemap =
-            data["value0"]["nodes"]["inners"][0]["value"]["nodemap"];
+        auto& nodemap = data["value0"]["nodes"][0]["nodemap"];
         REQUIRE(nodemap == 1343560972);
         nodemap = 1343560971;
         REQUIRE_THROWS_AS(
@@ -543,8 +513,7 @@ TEST_CASE("Test modifying set nodes")
     }
     SECTION("Modify datamap of node 0")
     {
-        auto& datamap =
-            data["value0"]["nodes"]["inners"][0]["value"]["datamap"];
+        auto& datamap = data["value0"]["nodes"][0]["datamap"];
         REQUIRE(datamap == 19407009);
         datamap = 19407008;
         REQUIRE_THROWS_AS(load_set(0),
@@ -554,8 +523,7 @@ TEST_CASE("Test modifying set nodes")
     }
     SECTION("Modify nodemap of node 1")
     {
-        auto& nodemap =
-            data["value0"]["nodes"]["inners"][1]["value"]["nodemap"];
+        auto& nodemap = data["value0"]["nodes"][1]["nodemap"];
         REQUIRE(nodemap == 0);
         nodemap = 1;
         REQUIRE_THROWS_AS(
@@ -567,8 +535,7 @@ TEST_CASE("Test modifying set nodes")
     }
     SECTION("Modify datamap of node 1")
     {
-        auto& datamap =
-            data["value0"]["nodes"]["inners"][1]["value"]["datamap"];
+        auto& datamap = data["value0"]["nodes"][1]["datamap"];
         REQUIRE(datamap == 536875008);
         datamap = 536875007;
         REQUIRE_THROWS_AS(load_set(0),
@@ -578,8 +545,7 @@ TEST_CASE("Test modifying set nodes")
     }
     SECTION("Corrupt datamap but keep the same popcount")
     {
-        auto& datamap =
-            data["value0"]["nodes"]["inners"][2]["value"]["datamap"];
+        auto& datamap = data["value0"]["nodes"][2]["datamap"];
         REQUIRE(datamap == 16777224);
         datamap = 536875008; // This number also has 2 bits set
         REQUIRE_THROWS_AS(
@@ -591,8 +557,7 @@ TEST_CASE("Test modifying set nodes")
     }
     SECTION("Corrupt nodemap but keep the same popcount")
     {
-        auto& nodemap =
-            data["value0"]["nodes"]["inners"][0]["value"]["nodemap"];
+        auto& nodemap = data["value0"]["nodes"][0]["nodemap"];
         REQUIRE(nodemap == 1343560972);
         nodemap = 1343560460; // This number has the same number of bits set
         REQUIRE_THROWS_AS(
@@ -603,11 +568,10 @@ TEST_CASE("Test modifying set nodes")
     }
     SECTION("Missing a child node")
     {
-        auto& key = data["value0"]["nodes"]["inners"][2]["key"];
-        REQUIRE(key == 2);
-        key = 92;
+        auto& children = data["value0"]["nodes"][0]["children"];
+        children       = {1, 2, 99, 4, 5, 6, 7, 8, 9, 10, 11};
         REQUIRE_THROWS_AS(load_set(0), immer_archive::invalid_node_id);
-        REQUIRE_THROWS_AS(load_set(1), immer_archive::invalid_node_id);
+        REQUIRE(load_set(1) == expected_set2);
     }
     SECTION("Same identity")
     {
