@@ -1,5 +1,9 @@
 #pragma once
 
+#include <immer-archive/cereal/immer_map.hpp>
+#include <immer-archive/cereal/immer_vector.hpp>
+#include <immer-archive/common/archive.hpp>
+
 #include <immer/array.hpp>
 #include <immer/flex_vector.hpp>
 #include <immer/map.hpp>
@@ -7,32 +11,10 @@
 
 #include <cereal/cereal.hpp>
 
-#include <immer-archive/cereal/immer_map.hpp>
-#include <immer-archive/cereal/immer_vector.hpp>
-
 namespace immer_archive::rbts {
 
 using node_id = std::uint64_t;
 static_assert(sizeof(void*) == sizeof(node_id));
-
-template <class T>
-struct leaf_node_load
-{
-    immer::array<T> data;
-
-    friend bool operator==(const leaf_node_load& left,
-                           const leaf_node_load& right)
-    {
-        return left.data == right.data;
-    }
-};
-
-template <class T>
-struct leaf_node_save
-{
-    const T* begin;
-    const T* end;
-};
 
 struct inner_node
 {
@@ -101,7 +83,7 @@ template <typename T,
           immer::detail::rbts::bits_t BL>
 struct archive_save
 {
-    immer::map<node_id, leaf_node_save<T>> leaves;
+    immer::map<node_id, values_save<T>> leaves;
     immer::map<node_id, inner_node> inners;
     immer::map<node_id, vector_save<T, MemoryPolicy, B, BL>> vectors;
     immer::map<node_id, flex_vector_save<T, MemoryPolicy, B, BL>> flex_vectors;
@@ -132,7 +114,7 @@ make_save_archive_for(const immer::flex_vector<T, MemoryPolicy, B, BL>&)
 template <typename T>
 struct archive_load
 {
-    immer::map<node_id, leaf_node_load<T>> leaves;
+    immer::map<node_id, values_load<T>> leaves;
     immer::map<node_id, inner_node> inners;
     immer::map<node_id, rbts_info> vectors;
     immer::map<node_id, rbts_info> flex_vectors;
@@ -153,12 +135,9 @@ template <typename T,
           immer::detail::rbts::bits_t BL>
 archive_load<T> fix_leaf_nodes(archive_save<T, MemoryPolicy, B, BL> ar)
 {
-    auto leaves = immer::map<node_id, leaf_node_load<T>>{};
+    auto leaves = immer::map<node_id, values_load<T>>{};
     for (const auto& item : ar.leaves) {
-        auto leaf = leaf_node_load<T>{
-            .data = immer::array<T>{item.second.begin, item.second.end},
-        };
-        leaves = std::move(leaves).set(item.first, leaf);
+        leaves = std::move(leaves).set(item.first, item.second);
     }
 
     auto vectors = immer::map<node_id, rbts_info>{};
@@ -182,34 +161,6 @@ archive_load<T> fix_leaf_nodes(archive_save<T, MemoryPolicy, B, BL> ar)
 /**
  * Serialization functions.
  */
-template <
-    class Archive,
-    class T,
-    typename = std::enable_if_t<
-        cereal::traits::detail::count_output_serializers<T, Archive>::value !=
-        0>>
-void save(Archive& ar, const leaf_node_save<T>& value)
-{
-    ar(cereal::make_size_tag(
-        static_cast<cereal::size_type>(value.end - value.begin)));
-    for (auto p = value.begin; p != value.end; ++p) {
-        ar(*p);
-    }
-}
-
-template <class Archive, class T>
-void load(Archive& ar, leaf_node_load<T>& m)
-{
-    cereal::size_type size;
-    ar(cereal::make_size_tag(size));
-
-    for (auto i = cereal::size_type{}; i < size; ++i) {
-        T x;
-        ar(x);
-        m.data = std::move(m.data).push_back(std::move(x));
-    }
-}
-
 template <class Archive>
 void serialize(Archive& ar, inner_node& value)
 {

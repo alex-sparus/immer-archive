@@ -143,7 +143,7 @@ save_to_archive(Container container, container_archive_save<Container> archive)
                                       .container = std::move(container),
                                   });
 
-    return {std::move(archive), root_id};
+    return {std::move(archive), container_id};
 }
 
 } // namespace champ

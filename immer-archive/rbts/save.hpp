@@ -96,7 +96,7 @@ struct archive_builder
 
         // SPDLOG_DEBUG("leaf node {}", id);
 
-        auto info = leaf_node_save<T>{
+        auto info = values_save<T>{
             .begin = first,
             .end   = first + pos.count(),
         };
