@@ -1,6 +1,6 @@
 #pragma once
 
-#include <immer-archive/champ/archive_champ.hpp>
+#include <immer-archive/champ/archive.hpp>
 #include <immer-archive/champ/champ.hpp>
 #include <immer-archive/traits.hpp>
 

@@ -7,26 +7,6 @@
 namespace immer_archive {
 namespace champ {
 
-template <typename T,
-          typename Hash,
-          typename Equal,
-          typename MemoryPolicy,
-          immer::detail::hamts::bits_t B>
-std::pair<nodes_save<T, B>, node_id> get_node_id(
-    nodes_save<T, B> ar,
-    const immer::detail::hamts::node<T, Hash, Equal, MemoryPolicy, B>* ptr)
-{
-    auto* ptr_void = static_cast<const void*>(ptr);
-    if (auto* maybe_id = ar.node_ptr_to_id.find(ptr_void)) {
-        auto id = *maybe_id;
-        return {std::move(ar), id};
-    }
-
-    const auto id     = ar.node_ptr_to_id.size();
-    ar.node_ptr_to_id = std::move(ar.node_ptr_to_id).set(ptr_void, id);
-    return {std::move(ar), id};
-}
-
 template <class T, immer::detail::hamts::bits_t B>
 struct nodes_archive_builder
 {

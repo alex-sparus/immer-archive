@@ -1,6 +1,6 @@
 #pragma once
 
-#include "archive_champ.hpp"
+#include "archive.hpp"
 #include "load.hpp"
 #include "save.hpp"
 
@@ -69,7 +69,7 @@ public:
 
     Container load(node_id root_id)
     {
-        if (root_id >= archive_.nodes.inners.size()) {
+        if (root_id >= archive_.nodes.size()) {
             throw invalid_node_id{root_id};
         }
 

@@ -8,6 +8,7 @@
 #include <immer/vector.hpp>
 
 #include <cereal/cereal.hpp>
+#include <immer-archive/cereal/immer_vector.hpp>
 
 #include <boost/endian/conversion.hpp>
 
@@ -26,6 +27,16 @@ struct inner_node_save
     bitmap_t nodemap;
     bitmap_t datamap;
     bool collisions{false};
+
+    template <class Archive>
+    void save(Archive& ar) const
+    {
+        ar(CEREAL_NVP(values),
+           CEREAL_NVP(children),
+           cereal::make_nvp("nodemap", boost::endian::native_to_big(nodemap)),
+           cereal::make_nvp("datamap", boost::endian::native_to_big(datamap)),
+           CEREAL_NVP(collisions));
+    }
 };
 
 template <class T, immer::detail::hamts::bits_t B>
@@ -49,6 +60,18 @@ struct inner_node_load
     {
         return left.tie() == right.tie();
     }
+
+    template <class Archive>
+    void load(Archive& ar)
+    {
+        ar(CEREAL_NVP(values),
+           CEREAL_NVP(children),
+           CEREAL_NVP(nodemap),
+           CEREAL_NVP(datamap),
+           CEREAL_NVP(collisions));
+        boost::endian::big_to_native_inplace(nodemap);
+        boost::endian::big_to_native_inplace(datamap);
+    }
 };
 
 template <class T, immer::detail::hamts::bits_t B>
@@ -60,16 +83,28 @@ struct nodes_save
     immer::map<const void*, node_id> node_ptr_to_id;
 };
 
-template <class T, immer::detail::hamts::bits_t B>
-struct nodes_load
+template <typename T,
+          typename Hash,
+          typename Equal,
+          typename MemoryPolicy,
+          immer::detail::hamts::bits_t B>
+std::pair<nodes_save<T, B>, node_id> get_node_id(
+    nodes_save<T, B> ar,
+    const immer::detail::hamts::node<T, Hash, Equal, MemoryPolicy, B>* ptr)
 {
-    immer::vector<inner_node_load<T, B>> inners;
-
-    friend bool operator==(const nodes_load& left, const nodes_load& right)
-    {
-        return left.inners == right.inners;
+    auto* ptr_void = static_cast<const void*>(ptr);
+    if (auto* maybe_id = ar.node_ptr_to_id.find(ptr_void)) {
+        auto id = *maybe_id;
+        return {std::move(ar), id};
     }
-};
+
+    const auto id     = ar.node_ptr_to_id.size();
+    ar.node_ptr_to_id = std::move(ar.node_ptr_to_id).set(ptr_void, id);
+    return {std::move(ar), id};
+}
+
+template <class T, immer::detail::hamts::bits_t B>
+using nodes_load = immer::vector<inner_node_load<T, B>>;
 
 template <template <class, immer::detail::hamts::bits_t> class InnerNodeType,
           class T,
@@ -93,62 +128,60 @@ linearize_map(const immer::map<node_id, inner_node_save<T, B>>& inners)
     return result;
 }
 
-template <class T, immer::detail::hamts::bits_t B>
-nodes_load<T, B> to_load_archive(const nodes_save<T, B>& archive)
-{
-    auto inners = linearize_map<inner_node_load>(archive.inners);
-    return {
-        .inners = std::move(inners),
-    };
-}
-
 /**
- * Serialization functions.
+ * Container is a champ-based container.
  */
-template <class Archive, class T, immer::detail::hamts::bits_t B>
-void save(Archive& ar, const inner_node_save<T, B>& value)
+template <class Container>
+struct container_archive_save
 {
-    auto& values          = value.values;
-    auto& children        = value.children;
-    const auto nodemap    = boost::endian::native_to_big(value.nodemap);
-    const auto datamap    = boost::endian::native_to_big(value.datamap);
-    const auto collisions = value.collisions;
-    ar(CEREAL_NVP(values),
-       CEREAL_NVP(children),
-       CEREAL_NVP(nodemap),
-       CEREAL_NVP(datamap),
-       CEREAL_NVP(collisions));
-}
+    using champ_t = std::decay_t<decltype(std::declval<Container>().impl())>;
+    using T       = typename champ_t::node_t::value_t;
 
-template <class Archive, class T, immer::detail::hamts::bits_t B>
-void load(Archive& ar, inner_node_load<T, B>& value)
-{
-    auto& values     = value.values;
-    auto& children   = value.children;
-    auto& nodemap    = value.nodemap;
-    auto& datamap    = value.datamap;
-    auto& collisions = value.collisions;
-    ar(CEREAL_NVP(values),
-       CEREAL_NVP(children),
-       CEREAL_NVP(nodemap),
-       CEREAL_NVP(datamap),
-       CEREAL_NVP(collisions));
-    boost::endian::big_to_native_inplace(nodemap);
-    boost::endian::big_to_native_inplace(datamap);
-}
+    nodes_save<T, champ_t::bits> nodes;
 
-template <class Archive, class T, immer::detail::hamts::bits_t B>
-void save(Archive& ar, const nodes_save<T, B>& value)
-{
-    auto inners = linearize_map<inner_node_save>(value.inners);
-    save(ar, inners);
-}
+    // Saving the archived container, so that no mutations are allowed to
+    // happen.
+    immer::vector<Container> containers;
 
-template <class Archive, class T, immer::detail::hamts::bits_t B>
-void load(Archive& ar, nodes_load<T, B>& value)
+    template <class Archive>
+    void save(Archive& ar) const
+    {
+        // To serialize, just save the list of nodes
+        auto inners = linearize_map<inner_node_save>(nodes.inners);
+        using cereal::save;
+        save(ar, inners);
+    }
+};
+
+template <class Container>
+struct container_archive_load
 {
-    auto& inners = value.inners;
-    load(ar, inners);
+    using champ_t = std::decay_t<decltype(std::declval<Container>().impl())>;
+    using T       = typename champ_t::node_t::value_t;
+
+    nodes_load<T, champ_t::bits> nodes;
+
+    friend bool operator==(const container_archive_load& left,
+                           const container_archive_load& right)
+    {
+        return left.nodes == right.nodes;
+    }
+
+    template <class Archive>
+    void load(Archive& ar)
+    {
+        using cereal::load;
+        load(ar, nodes);
+    }
+};
+
+template <class Container>
+container_archive_load<Container>
+to_load_archive(const container_archive_save<Container>& archive)
+{
+    return {
+        .nodes = linearize_map<inner_node_load>(archive.nodes.inners),
+    };
 }
 
 } // namespace champ
