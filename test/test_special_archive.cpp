@@ -97,12 +97,27 @@ struct test_data
 
     immer_archive::archivable<vector_one<meta>> metas;
 
+    // Map value is indirectly archivable
+    immer_archive::archivable<immer::map<int, meta>> metas_map;
+
+    // Map value is directly archivable
+    immer_archive::archivable<
+        immer::map<int, immer_archive::archivable<vector_one<int>>>>
+        vectors_map;
+
     // Also test having meta directly, not inside an archivable type
     meta single_meta;
 
     auto tie() const
     {
-        return std::tie(ints, strings, flex_ints, map, metas, single_meta);
+        return std::tie(ints,
+                        strings,
+                        flex_ints,
+                        map,
+                        metas,
+                        metas_map,
+                        vectors_map,
+                        single_meta);
     }
 
     friend bool operator==(const test_data& left, const test_data& right)
@@ -121,6 +136,8 @@ struct test_data
            CEREAL_NVP(flex_ints),
            CEREAL_NVP(map),
            CEREAL_NVP(metas),
+           CEREAL_NVP(metas_map),
+           CEREAL_NVP(vectors_map),
            CEREAL_NVP(single_meta));
     }
 };
@@ -145,7 +162,13 @@ inline auto get_archives_types(const test_data&)
         hana::make_pair(hana::type_c<vector_one<meta_meta>>,
                         BOOST_HANA_STRING("meta_metas")),
         hana::make_pair(hana::type_c<immer::table<test_value>>,
-                        BOOST_HANA_STRING("table_test_value"))
+                        BOOST_HANA_STRING("table_test_value")),
+        hana::make_pair(hana::type_c<immer::map<int, meta>>,
+                        BOOST_HANA_STRING("int_meta_map")),
+        hana::make_pair(
+            hana::type_c<
+                immer::map<int, immer_archive::archivable<vector_one<int>>>>,
+            BOOST_HANA_STRING("int_vector_map"))
 
     );
     return names;
@@ -204,18 +227,29 @@ TEST_CASE("Special archive minimal test")
         4,
         5,
     };
+    const auto meta_value = meta{
+        .ints = ints1,
+        .metas =
+            {
+                meta_meta{
+                    .ints = ints1,
+                },
+            },
+    };
     const auto test1 = test_data{
         .metas =
             {
-                meta{
-                    .ints = ints1,
-                    .metas =
-                        {
-                            meta_meta{
-                                .ints = ints1,
-                            },
-                        },
-                },
+                meta_value,
+            },
+        .metas_map =
+            {
+                {234, meta_value},
+            },
+        .vectors_map =
+            {
+                {234, {2, 3, 4}},
+                {567, {5, 6, 7}},
+                {789, ints1},
             },
     };
 
@@ -422,6 +456,8 @@ TEST_CASE("Special archive loads empty test_data")
     "flex_ints": 0,
     "map": 0,
     "metas": 0,
+    "metas_map": 0,
+    "vectors_map": 0,
     "single_meta": {"ints": 0, "metas": 0}
   },
   "archives": {
@@ -458,7 +494,13 @@ TEST_CASE("Special archive loads empty test_data")
       "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
       "flex_vectors": []
     },
-    "table_test_value": []
+    "table_test_value": [],
+    "int_meta_map": [
+        {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
+    ],
+    "int_vector_map": [
+        {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
+    ]
   }
 })";
 
@@ -520,7 +562,9 @@ TEST_CASE("Special archive throws cereal::Exception")
       "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
       "flex_vectors": []
     },
-    "table_test_value": []
+    "table_test_value": [],
+    "int_meta_map": [],
+    "int_vector_map": []
   }
 })";
 
