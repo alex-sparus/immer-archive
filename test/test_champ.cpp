@@ -60,7 +60,7 @@ struct broken_hash
         if ("10" < str && str < "19") {
             return 123;
         }
-        return std::hash<std::string>{}(str);
+        return immer_archive::xx_hash<std::string>{}(str);
     }
 
     std::size_t operator()(int map_key) const
@@ -576,5 +576,195 @@ TEST_CASE("Test modifying set nodes")
                 data.dump());
         auto loader = immer_archive::champ::container_loader{loaded_archive};
         REQUIRE(loader.load(0).identity() == loader.load(0).identity());
+    }
+}
+
+TEST_CASE("Test modifying nodes with collisions")
+{
+    using Container = immer::set<std::string, broken_hash>;
+
+    const auto expected_set  = gen_set(Container{}, 30);
+    const auto expected_set2 = expected_set.insert("thirty");
+
+    auto [ar, set_id] = immer_archive::champ::save_to_archive(expected_set, {});
+    auto set2_id      = immer_archive::champ::node_id{};
+    std::tie(ar, set2_id) =
+        immer_archive::champ::save_to_archive(expected_set2, std::move(ar));
+    const auto ar_str        = to_json(ar);
+    const auto expected_data = json_t::parse(ar_str);
+
+    auto data = json_t::parse(R"({
+  "value0": [
+    {
+      "values": ["8", "27", "6", "29", "2", "0", "1", "7", "20", "4"],
+      "children": [1, 2, 3, 4, 5, 6],
+      "nodemap": 269550856,
+      "datamap": 2898085,
+      "collisions": false
+    },
+    {
+      "values": ["25", "24"],
+      "children": [],
+      "nodemap": 0,
+      "datamap": 536875008,
+      "collisions": false
+    },
+    {
+      "values": ["23", "26", "9"],
+      "children": [],
+      "nodemap": 0,
+      "datamap": 2147747840,
+      "collisions": false
+    },
+    {
+      "values": ["28", "22"],
+      "children": [],
+      "nodemap": 0,
+      "datamap": 8388640,
+      "collisions": false
+    },
+    {
+      "values": ["3", "19"],
+      "children": [],
+      "nodemap": 0,
+      "datamap": 2147485696,
+      "collisions": false
+    },
+    {
+      "values": ["10", "5"],
+      "children": [],
+      "nodemap": 0,
+      "datamap": 33556480,
+      "collisions": false
+    },
+    {
+      "values": ["21"],
+      "children": [7],
+      "nodemap": 134217728,
+      "datamap": 268435456,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [8],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [9],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [10],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [11],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [12],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [13],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [14],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [15],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [16],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [17],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": [],
+      "children": [18],
+      "nodemap": 16777216,
+      "datamap": 0,
+      "collisions": false
+    },
+    {
+      "values": ["18", "17", "16", "15", "14", "13", "12", "11"],
+      "children": [],
+      "nodemap": 0,
+      "datamap": 0,
+      "collisions": true
+    },
+    {
+      "values": ["8", "27", "6", "29", "2", "0", "1", "thirty", "7", "20", "4"],
+      "children": [1, 2, 3, 4, 5, 6],
+      "nodemap": 269550856,
+      "datamap": 2898087,
+      "collisions": false
+    }
+  ]
+})");
+    INFO(ar_str);
+    REQUIRE(data == expected_data);
+
+    const auto load_set = [&data](auto id) {
+        const auto loaded_archive =
+            from_json<immer_archive::champ::container_archive_load<Container>>(
+                data.dump());
+        auto loader = immer_archive::champ::container_loader{loaded_archive};
+        return loader.load(id);
+    };
+
+    SECTION("Loads correctly")
+    {
+        REQUIRE(load_set(set_id) == expected_set);
+        REQUIRE(load_set(set2_id) == expected_set2);
+    }
+    SECTION("Order of collisions doesn't matter")
+    {
+        auto& node = data["value0"][18];
+        REQUIRE(
+            node["values"] ==
+            json_t::array({"18", "17", "16", "15", "14", "13", "12", "11"}));
+        node["values"] = {"15", "16", "17", "18", "14", "13", "12", "11"};
+        REQUIRE(load_set(set_id) == expected_set);
+        REQUIRE(load_set(set2_id) == expected_set2);
+
+        // Remove "18"
+        node["values"] = {"15", "16", "17", "14", "13", "12", "11"};
+        REQUIRE(load_set(set_id) == expected_set.erase("18"));
     }
 }
