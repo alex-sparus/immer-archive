@@ -80,6 +80,7 @@
 
       devShells.default = pkgs.mkShell.override {stdenv = our_llvm.stdenv;} {
         NIX_HARDENING_ENABLE = "";
+        inputsFrom = [self.packages.${system}.immer-archive];
         packages = with pkgs;
           [
             # Tools
@@ -87,22 +88,13 @@
             cmake-format
             just
             fzf
+            starship
             # for the llvm-symbolizer binary, that allows to show stacks in ASAN and LeakSanitizer.
             our_llvm.bintools-unwrapped
 
             # Build-time
             cmake
             ninja
-
-            # Dependencies
-            spdlog
-            arximboldi-cereal
-            fmt_9
-            catch2_3
-            boost
-            nlohmann_json
-            immer.defaultPackage.${system}
-            xxHash
           ]
           ++ lib.optionals stdenv.isLinux [
             valgrind
@@ -116,6 +108,7 @@
             source just.bash
             complete -F _just -o bashdefault -o default j
             alias j=just
+            eval "$(starship init bash)"
           '';
       };
 
