@@ -88,7 +88,6 @@ TEST_CASE("Test saving a set")
         const auto loaded_archive =
             from_json<immer_archive::champ::container_archive_load<Container>>(
                 ar_str);
-        REQUIRE(loaded_archive.containers.size() == 1);
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
         const auto loaded = loader.load(set_id);
@@ -107,7 +106,6 @@ TEST_CASE("Test saving a set")
         const auto loaded_archive = from_json<
             immer_archive::champ::container_archive_load<WrongContainer>>(
             ar_str);
-        REQUIRE(loaded_archive.containers.size() == 1);
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
         REQUIRE_THROWS_AS(
@@ -131,7 +129,6 @@ TEST_CASE("Test set with xxHash")
         const auto loaded_archive =
             from_json<immer_archive::champ::container_archive_load<Container>>(
                 ar_str);
-        REQUIRE(loaded_archive.containers.size() == 1);
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
         const auto loaded = loader.load(set_id);
@@ -204,7 +201,6 @@ TEST_CASE("Test saving a map")
         const auto loaded_archive =
             from_json<immer_archive::champ::container_archive_load<Container>>(
                 ar_str);
-        REQUIRE(loaded_archive.containers.size() == 1);
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
         const auto loaded = loader.load(map_id);
@@ -224,7 +220,6 @@ TEST_CASE("Test saving a map")
         const auto loaded_archive = from_json<
             immer_archive::champ::container_archive_load<WrongContainer>>(
             ar_str);
-        REQUIRE(loaded_archive.containers.size() == 1);
 
         auto loader = immer_archive::champ::container_loader{loaded_archive};
         REQUIRE_THROWS_AS(
@@ -381,16 +376,16 @@ TEST_CASE("Test modifying set nodes")
     const auto expected_set  = gen_set(Container{}, 30);
     const auto expected_set2 = expected_set.insert("thirty");
 
-    // auto [ar, set_id] = immer_archive::champ::save_to_archive(expected_set,
-    // {}); auto set2_id      = immer_archive::champ::node_id{}; std::tie(ar,
-    // set2_id) =
-    //     immer_archive::champ::save_to_archive(expected_set2, std::move(ar));
-    // const auto ar_str = to_json(ar);
+    auto [ar, set_id] = immer_archive::champ::save_to_archive(expected_set, {});
+    auto set2_id      = immer_archive::champ::node_id{};
+    std::tie(ar, set2_id) =
+        immer_archive::champ::save_to_archive(expected_set2, std::move(ar));
+    const auto ar_str        = to_json(ar);
+    const auto expected_data = json_t::parse(ar_str);
     // REQUIRE(ar_str == "");
 
     auto data = json_t::parse(R"({
-  "value0": {
-    "nodes": [
+  "value0": [
       {
         "values": ["15", "27", "6", "0", "1", "20", "4"],
         "children": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -482,10 +477,9 @@ TEST_CASE("Test modifying set nodes")
         "datamap": 19407011,
         "collisions": false
       }
-    ],
-    "containers": [{"key": 0, "value": 0}, {"key": 1, "value": 12}]
-  }
+    ]
 })");
+    REQUIRE(data == expected_data);
 
     const auto load_set = [&data](auto id) {
         const auto loaded_archive =
@@ -497,81 +491,81 @@ TEST_CASE("Test modifying set nodes")
 
     SECTION("Loads correctly")
     {
-        REQUIRE(load_set(0) == expected_set);
-        REQUIRE(load_set(1) == expected_set2);
+        REQUIRE(load_set(set_id) == expected_set);
+        REQUIRE(load_set(set2_id) == expected_set2);
     }
     SECTION("Modify nodemap of node 0")
     {
-        auto& nodemap = data["value0"]["nodes"][0]["nodemap"];
+        auto& nodemap = data["value0"][0]["nodemap"];
         REQUIRE(nodemap == 1343560972);
         nodemap = 1343560971;
         REQUIRE_THROWS_AS(
-            load_set(0),
+            load_set(set_id),
             immer_archive::champ::children_count_corrupted_exception);
         // Node 0 doesn't affect the second set
-        REQUIRE(load_set(1) == expected_set2);
+        REQUIRE(load_set(set2_id) == expected_set2);
     }
     SECTION("Modify datamap of node 0")
     {
-        auto& datamap = data["value0"]["nodes"][0]["datamap"];
+        auto& datamap = data["value0"][0]["datamap"];
         REQUIRE(datamap == 19407009);
         datamap = 19407008;
-        REQUIRE_THROWS_AS(load_set(0),
+        REQUIRE_THROWS_AS(load_set(set_id),
                           immer_archive::champ::data_count_corrupted_exception);
         // Node 0 doesn't affect the second set
-        REQUIRE(load_set(1) == expected_set2);
+        REQUIRE(load_set(set2_id) == expected_set2);
     }
     SECTION("Modify nodemap of node 1")
     {
-        auto& nodemap = data["value0"]["nodes"][1]["nodemap"];
+        auto& nodemap = data["value0"][1]["nodemap"];
         REQUIRE(nodemap == 0);
         nodemap = 1;
         REQUIRE_THROWS_AS(
-            load_set(0),
+            load_set(set_id),
             immer_archive::champ::children_count_corrupted_exception);
         REQUIRE_THROWS_AS(
-            load_set(1),
+            load_set(set2_id),
             immer_archive::champ::children_count_corrupted_exception);
     }
     SECTION("Modify datamap of node 1")
     {
-        auto& datamap = data["value0"]["nodes"][1]["datamap"];
+        auto& datamap = data["value0"][1]["datamap"];
         REQUIRE(datamap == 536875008);
         datamap = 536875007;
-        REQUIRE_THROWS_AS(load_set(0),
+        REQUIRE_THROWS_AS(load_set(set_id),
                           immer_archive::champ::data_count_corrupted_exception);
-        REQUIRE_THROWS_AS(load_set(1),
+        REQUIRE_THROWS_AS(load_set(set2_id),
                           immer_archive::champ::data_count_corrupted_exception);
     }
     SECTION("Corrupt datamap but keep the same popcount")
     {
-        auto& datamap = data["value0"]["nodes"][2]["datamap"];
+        auto& datamap = data["value0"][2]["datamap"];
         REQUIRE(datamap == 16777224);
         datamap = 536875008; // This number also has 2 bits set
         REQUIRE_THROWS_AS(
-            load_set(0),
+            load_set(set_id),
             immer_archive::champ::hash_validation_failed_exception);
         REQUIRE_THROWS_AS(
-            load_set(1),
+            load_set(set2_id),
             immer_archive::champ::hash_validation_failed_exception);
     }
     SECTION("Corrupt nodemap but keep the same popcount")
     {
-        auto& nodemap = data["value0"]["nodes"][0]["nodemap"];
+        auto& nodemap = data["value0"][0]["nodemap"];
         REQUIRE(nodemap == 1343560972);
         nodemap = 1343560460; // This number has the same number of bits set
         REQUIRE_THROWS_AS(
-            load_set(0),
+            load_set(set_id),
             immer_archive::champ::hash_validation_failed_exception);
         // Node 0 doesn't affect the second set
-        REQUIRE(load_set(1) == expected_set2);
+        REQUIRE(load_set(set2_id) == expected_set2);
     }
     SECTION("Missing a child node")
     {
-        auto& children = data["value0"]["nodes"][0]["children"];
+        auto& children = data["value0"][0]["children"];
         children       = {1, 2, 99, 4, 5, 6, 7, 8, 9, 10, 11};
-        REQUIRE_THROWS_AS(load_set(0), immer_archive::invalid_node_id);
-        REQUIRE(load_set(1) == expected_set2);
+        REQUIRE_THROWS_AS(load_set(set_id), immer_archive::invalid_node_id);
+        REQUIRE(load_set(set2_id) == expected_set2);
     }
     SECTION("Same identity")
     {

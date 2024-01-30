@@ -60,7 +60,7 @@ struct nodes_save
     immer::map<const void*, node_id> node_ptr_to_id;
 };
 
-template <class T, immer::detail::hamts::bits_t B = immer::default_bits>
+template <class T, immer::detail::hamts::bits_t B>
 struct nodes_load
 {
     immer::vector<inner_node_load<T, B>> inners;

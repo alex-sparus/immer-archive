@@ -67,14 +67,13 @@ public:
     {
     }
 
-    Container load(node_id id)
+    Container load(node_id root_id)
     {
-        auto* root_id = archive_.containers.find(id);
-        if (!root_id) {
-            throw archive_exception{fmt::format("Unknown container ID {}", id)};
+        if (root_id >= archive_.nodes.inners.size()) {
+            throw invalid_node_id{root_id};
         }
 
-        auto [root, values]    = nodes_.load_inner(*root_id);
+        auto [root, values]    = nodes_.load_inner(root_id);
         const auto items_count = [&values = values] {
             auto count = std::size_t{};
             for (const auto& items : values) {
@@ -125,7 +124,7 @@ save_to_archive(Container container, container_archive_save<Container> archive)
     std::tie(archive.nodes, root_id) =
         get_node_id(std::move(archive.nodes), impl.root);
 
-    if (auto* p = archive.containers.find(root_id)) {
+    if (archive.nodes.inners.count(root_id)) {
         // Already been saved
         return {std::move(archive), root_id};
     }
@@ -133,17 +132,10 @@ save_to_archive(Container container, container_archive_save<Container> archive)
     archive.nodes = save_nodes(impl, std::move(archive.nodes));
     assert(archive.nodes.inners.count(root_id));
 
-    const auto container_id = archive.containers.size();
-    assert(archive.containers.count(container_id) == 0);
+    archive.containers =
+        std::move(archive.containers).push_back(std::move(container));
 
-    archive.containers = std::move(archive.containers)
-                             .set(container_id,
-                                  container_save<Container>{
-                                      .root_id   = root_id,
-                                      .container = std::move(container),
-                                  });
-
-    return {std::move(archive), container_id};
+    return {std::move(archive), root_id};
 }
 
 } // namespace champ

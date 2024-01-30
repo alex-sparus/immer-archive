@@ -443,12 +443,9 @@ TEST_CASE("Special archive loads empty test_data")
       "vectors": [],
       "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}]
     },
-    "int_string_map": {
-      "nodes": [
+    "int_string_map": [
           {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
-      ],
-      "containers": [{"key": 0, "value": 0}]
-    },
+    ],
     "metas": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
@@ -461,10 +458,7 @@ TEST_CASE("Special archive loads empty test_data")
       "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
       "flex_vectors": []
     },
-    "table_test_value": {
-      "nodes": [],
-      "containers": []
-    }
+    "table_test_value": []
   }
 })";
 
@@ -511,12 +505,9 @@ TEST_CASE("Special archive throws cereal::Exception")
       "vectors": [],
       "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
     },
-    "int_string_map": {
-      "nodes": [
-            {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
-        ],
-      "containers": [{"key": 0, "value": 0}]
-    },
+    "int_string_map": [
+        {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
+    ],
     "metas": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
@@ -529,10 +520,7 @@ TEST_CASE("Special archive throws cereal::Exception")
       "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
       "flex_vectors": []
     },
-    "table_test_value": {
-      "nodes": [],
-      "containers": []
-    }
+    "table_test_value": []
   }
 })";
 
