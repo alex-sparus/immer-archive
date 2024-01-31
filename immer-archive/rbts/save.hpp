@@ -160,7 +160,7 @@ save_to_archive(immer::vector<T, MemoryPolicy, B, BL> vec,
         detail::get_node_id(std::move(archive), impl.root);
     std::tie(archive, tail_id) =
         detail::get_node_id(std::move(archive), impl.tail);
-    const auto tree_id = rbts_id{
+    const auto tree_id = rbts_info{
         .root = root_id,
         .tail = tail_id,
     };
@@ -176,20 +176,12 @@ save_to_archive(immer::vector<T, MemoryPolicy, B, BL> vec,
     assert(archive.inners.count(root_id));
     assert(archive.leaves.count(tail_id));
 
-    const auto vector_id = archive.rbts_to_id.size();
-    assert(archive.vectors.count(vector_id) == 0);
+    const auto vector_id = archive.vectors.size();
 
     archive.rbts_to_id = std::move(archive.rbts_to_id).set(tree_id, vector_id);
-    archive.vectors    = std::move(archive.vectors)
-                          .set(vector_id,
-                               vector_save<T, MemoryPolicy, B, BL>{
-                                   .rbts =
-                                       rbts_info{
-                                           .root = root_id,
-                                           .tail = tail_id,
-                                       },
-                                   .vector = std::move(vec),
-                               });
+    archive.vectors    = std::move(archive.vectors).push_back(tree_id);
+    archive.saved_vectors =
+        std::move(archive.saved_vectors).push_back(std::move(vec));
 
     return {std::move(archive), vector_id};
 }
@@ -209,7 +201,7 @@ save_to_archive(immer::flex_vector<T, MemoryPolicy, B, BL> vec,
         detail::get_node_id(std::move(archive), impl.root);
     std::tie(archive, tail_id) =
         detail::get_node_id(std::move(archive), impl.tail);
-    const auto tree_id = rbts_id{
+    const auto tree_id = rbts_info{
         .root = root_id,
         .tail = tail_id,
     };
@@ -225,20 +217,12 @@ save_to_archive(immer::flex_vector<T, MemoryPolicy, B, BL> vec,
     assert(archive.inners.count(root_id));
     assert(archive.leaves.count(tail_id));
 
-    const auto vector_id = archive.rbts_to_id.size();
-    assert(archive.flex_vectors.count(vector_id) == 0);
+    const auto vector_id = archive.vectors.size();
 
     archive.rbts_to_id = std::move(archive.rbts_to_id).set(tree_id, vector_id);
-    archive.flex_vectors = std::move(archive.flex_vectors)
-                               .set(vector_id,
-                                    flex_vector_save<T, MemoryPolicy, B, BL>{
-                                        .rbts =
-                                            rbts_info{
-                                                .root = root_id,
-                                                .tail = tail_id,
-                                            },
-                                        .vector = std::move(vec),
-                                    });
+    archive.vectors    = std::move(archive.vectors).push_back(tree_id);
+    archive.saved_flex_vectors =
+        std::move(archive.saved_flex_vectors).push_back(std::move(vec));
 
     return {std::move(archive), vector_id};
 }

@@ -464,20 +464,17 @@ TEST_CASE("Special archive loads empty test_data")
     "ints": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
-      "flex_vectors": []
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "strings": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
-      "flex_vectors": []
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "flex_ints": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [],
-      "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}]
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "int_string_map": [
           {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
@@ -485,14 +482,12 @@ TEST_CASE("Special archive loads empty test_data")
     "metas": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
-      "flex_vectors": []
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "meta_metas": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1}}],
-      "flex_vectors": []
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "table_test_value": [],
     "int_meta_map": [
@@ -532,20 +527,17 @@ TEST_CASE("Special archive throws cereal::Exception")
     "ints": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-      "flex_vectors": []
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "strings": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-      "flex_vectors": []
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "flex_ints": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [],
-      "flex_vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}]
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "int_string_map": [
         {"values": [], "children": [], "nodemap": 0, "datamap": 0, "collisions": false}
@@ -553,14 +545,12 @@ TEST_CASE("Special archive throws cereal::Exception")
     "metas": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-      "flex_vectors": []
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "meta_metas": {
       "leaves": [{"key": 1, "value": []}],
       "inners": [{"key": 0, "value": {"children": [], "relaxed": false}}],
-      "vectors": [{"key": 0, "value": {"root": 0, "tail": 1, "shift": 1}}],
-      "flex_vectors": []
+      "vectors": [{"root": 0, "tail": 1}]
     },
     "table_test_value": [],
     "int_meta_map": [],
@@ -572,5 +562,5 @@ TEST_CASE("Special archive throws cereal::Exception")
         immer_archive::from_json_with_archive<test_data>(json_archive_str),
         ::cereal::Exception,
         Catch::Matchers::Message("Failed to load a container ID 99 from the "
-                                 "archive: Unknown vector ID 99"));
+                                 "archive: Container ID 99 is not found"));
 }

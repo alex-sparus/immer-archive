@@ -98,18 +98,19 @@ public:
 
     immer::vector<T, MemoryPolicy, B, BL> load_vector(node_id id)
     {
-        auto* info = ar_.vectors.find(id);
-        if (!info) {
-            throw archive_exception{fmt::format("Unknown vector ID {}", id)};
+        if (id >= ar_.vectors.size()) {
+            throw invalid_container_id{id};
         }
 
+        const auto& info = ar_.vectors[id];
+
         const auto relaxed_allowed = false;
-        auto root = load_inner(info->root, {}, relaxed_allowed);
-        auto tail = load_leaf(info->tail);
+        auto root                  = load_inner(info.root, {}, relaxed_allowed);
+        auto tail                  = load_leaf(info.tail);
 
         const auto tree_size =
-            get_node_size(info->root) + get_node_size(info->tail);
-        const auto depth = get_node_depth(info->root);
+            get_node_size(info.root) + get_node_size(info.tail);
+        const auto depth = get_node_depth(info.root);
         const auto shift = get_shift_for_depth(B, BL, depth);
 
         auto impl = rbtree{tree_size,
@@ -123,18 +124,19 @@ public:
 
     immer::flex_vector<T, MemoryPolicy, B, BL> load_flex_vector(node_id id)
     {
-        auto* info = ar_.flex_vectors.find(id);
-        if (!info) {
-            throw invalid_node_id{id};
+        if (id >= ar_.vectors.size()) {
+            throw invalid_container_id{id};
         }
 
+        const auto& info = ar_.vectors[id];
+
         const auto relaxed_allowed = true;
-        auto root = load_inner(info->root, {}, relaxed_allowed);
-        auto tail = load_leaf(info->tail);
+        auto root                  = load_inner(info.root, {}, relaxed_allowed);
+        auto tail                  = load_leaf(info.tail);
 
         const auto tree_size =
-            get_node_size(info->root) + get_node_size(info->tail);
-        const auto depth = get_node_depth(info->root);
+            get_node_size(info.root) + get_node_size(info.tail);
+        const auto depth = get_node_depth(info.root);
         const auto shift = get_shift_for_depth(B, BL, depth);
 
         auto impl = rrbtree{tree_size,

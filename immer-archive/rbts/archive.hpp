@@ -27,6 +27,12 @@ struct inner_node
     {
         return left.tie() == right.tie();
     }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(CEREAL_NVP(children), CEREAL_NVP(relaxed));
+    }
 };
 
 struct rbts_info
@@ -40,41 +46,12 @@ struct rbts_info
     {
         return left.tie() == right.tie();
     }
-};
 
-struct rbts_id
-{
-    node_id root;
-    node_id tail;
-
-    auto tie() const { return std::tie(root, tail); }
-
-    friend bool operator==(const rbts_id& left, const rbts_id& right)
+    template <class Archive>
+    void serialize(Archive& ar)
     {
-        return left.tie() == right.tie();
+        ar(CEREAL_NVP(root), CEREAL_NVP(tail));
     }
-};
-
-template <typename T,
-          typename MemoryPolicy,
-          immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL>
-struct vector_save
-{
-    rbts_info rbts;
-    // Saving the archived vector, so that no mutations are allowed to happen.
-    immer::vector<T, MemoryPolicy, B, BL> vector;
-};
-
-template <typename T,
-          typename MemoryPolicy,
-          immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL>
-struct flex_vector_save
-{
-    rbts_info rbts;
-    // Saving the archived vector, so that no mutations are allowed to happen.
-    immer::flex_vector<T, MemoryPolicy, B, BL> vector;
 };
 
 template <typename T,
@@ -85,11 +62,21 @@ struct archive_save
 {
     immer::map<node_id, values_save<T>> leaves;
     immer::map<node_id, inner_node> inners;
-    immer::map<node_id, vector_save<T, MemoryPolicy, B, BL>> vectors;
-    immer::map<node_id, flex_vector_save<T, MemoryPolicy, B, BL>> flex_vectors;
+    immer::vector<rbts_info> vectors;
 
-    immer::map<rbts_id, node_id> rbts_to_id;
+    immer::map<rbts_info, node_id> rbts_to_id;
     immer::map<const void*, node_id> node_ptr_to_id;
+
+    // Saving the archived vectors, so that no mutations are allowed to happen.
+    immer::vector<immer::vector<T, MemoryPolicy, B, BL>> saved_vectors;
+    immer::vector<immer::flex_vector<T, MemoryPolicy, B, BL>>
+        saved_flex_vectors;
+
+    template <class Archive>
+    void save(Archive& ar) const
+    {
+        ar(CEREAL_NVP(leaves), CEREAL_NVP(inners), CEREAL_NVP(vectors));
+    }
 };
 
 template <typename T,
@@ -116,14 +103,19 @@ struct archive_load
 {
     immer::map<node_id, values_load<T>> leaves;
     immer::map<node_id, inner_node> inners;
-    immer::map<node_id, rbts_info> vectors;
-    immer::map<node_id, rbts_info> flex_vectors;
+    immer::vector<rbts_info> vectors;
 
-    auto tie() const { return std::tie(leaves, inners, vectors, flex_vectors); }
+    auto tie() const { return std::tie(leaves, inners, vectors); }
 
     friend bool operator==(const archive_load& left, const archive_load& right)
     {
         return left.tie() == right.tie();
+    }
+
+    template <class Archive>
+    void load(Archive& ar)
+    {
+        ar(CEREAL_NVP(leaves), CEREAL_NVP(inners), CEREAL_NVP(vectors));
     }
 };
 
@@ -140,99 +132,11 @@ archive_load<T> fix_leaf_nodes(archive_save<T, MemoryPolicy, B, BL> ar)
         leaves = std::move(leaves).set(item.first, item.second);
     }
 
-    auto vectors = immer::map<node_id, rbts_info>{};
-    for (const auto& [id, info] : ar.vectors) {
-        vectors = std::move(vectors).set(id, info.rbts);
-    }
-
-    auto flex_vectors = immer::map<node_id, rbts_info>{};
-    for (const auto& [id, info] : ar.flex_vectors) {
-        flex_vectors = std::move(flex_vectors).set(id, info.rbts);
-    }
-
     return {
-        .leaves       = std::move(leaves),
-        .inners       = std::move(ar.inners),
-        .vectors      = std::move(vectors),
-        .flex_vectors = std::move(flex_vectors),
+        .leaves  = std::move(leaves),
+        .inners  = std::move(ar.inners),
+        .vectors = std::move(ar.vectors),
     };
-}
-
-/**
- * Serialization functions.
- */
-template <class Archive>
-void serialize(Archive& ar, inner_node& value)
-{
-    auto& children = value.children;
-    auto& relaxed  = value.relaxed;
-    ar(CEREAL_NVP(children), CEREAL_NVP(relaxed));
-}
-
-template <class Archive>
-void serialize(Archive& ar, rbts_info& value)
-{
-    auto& root = value.root;
-    auto& tail = value.tail;
-    ar(CEREAL_NVP(root), CEREAL_NVP(tail));
-}
-
-template <class Archive>
-void serialize(Archive& ar, rbts_id& value)
-{
-    auto& root = value.root;
-    auto& tail = value.tail;
-    ar(CEREAL_NVP(root), CEREAL_NVP(tail));
-}
-
-template <class Archive,
-          typename T,
-          typename MemoryPolicy,
-          immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL>
-void save(Archive& ar, const vector_save<T, MemoryPolicy, B, BL>& value)
-{
-    serialize(ar, const_cast<rbts_info&>(value.rbts));
-}
-
-template <class Archive,
-          typename T,
-          typename MemoryPolicy,
-          immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL>
-void save(Archive& ar, const flex_vector_save<T, MemoryPolicy, B, BL>& value)
-{
-    serialize(ar, const_cast<rbts_info&>(value.rbts));
-}
-
-template <class Archive,
-          typename T,
-          typename MemoryPolicy,
-          immer::detail::rbts::bits_t B,
-          immer::detail::rbts::bits_t BL>
-void save(Archive& ar, const archive_save<T, MemoryPolicy, B, BL>& value)
-{
-    auto& leaves       = value.leaves;
-    auto& inners       = value.inners;
-    auto& vectors      = value.vectors;
-    auto& flex_vectors = value.flex_vectors;
-    ar(CEREAL_NVP(leaves),
-       CEREAL_NVP(inners),
-       CEREAL_NVP(vectors),
-       CEREAL_NVP(flex_vectors));
-}
-
-template <class Archive, class T>
-void load(Archive& ar, archive_load<T>& value)
-{
-    auto& leaves       = value.leaves;
-    auto& inners       = value.inners;
-    auto& vectors      = value.vectors;
-    auto& flex_vectors = value.flex_vectors;
-    ar(CEREAL_NVP(leaves),
-       CEREAL_NVP(inners),
-       CEREAL_NVP(vectors),
-       CEREAL_NVP(flex_vectors));
 }
 
 } // namespace immer_archive::rbts
@@ -240,9 +144,9 @@ void load(Archive& ar, archive_load<T>& value)
 namespace std {
 
 template <>
-struct hash<immer_archive::rbts::rbts_id>
+struct hash<immer_archive::rbts::rbts_info>
 {
-    auto operator()(const immer_archive::rbts::rbts_id& x) const
+    auto operator()(const immer_archive::rbts::rbts_info& x) const
     {
         const auto boost_combine = [](std::size_t& seed, std::size_t hash) {
             seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);

@@ -31,6 +31,16 @@ public:
     }
 };
 
+class invalid_container_id : public archive_exception
+{
+public:
+    explicit invalid_container_id(std::uint64_t container_id)
+        : archive_exception{
+              fmt::format("Container ID {} is not found", container_id)}
+    {
+    }
+};
+
 class invalid_children_count : public archive_exception
 {
 public:

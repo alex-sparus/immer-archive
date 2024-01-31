@@ -427,16 +427,18 @@ TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
 {
     constexpr auto for_each_generated_length_flex =
         [](auto init, int count, auto&& process) {
+            // Combine flex and non-flex
             process(init);
-            process(init + init);
+            process(flex_vector_one<int>{init});
+            process(flex_vector_one<int>{init} + init);
             for (int i = 0; i < count; ++i) {
                 auto prev = init;
                 init      = std::move(init).push_back(i);
 
                 process(init);
-                process(prev + init);
-                process(init + prev);
-                process(init + init);
+                process(flex_vector_one<int>{prev} + init);
+                process(flex_vector_one<int>{init} + prev);
+                process(flex_vector_one<int>{init} + init);
             }
         };
 
@@ -461,16 +463,14 @@ TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
     {
         auto ar = example_archive_save{};
         for_each_generated_length_flex(
-            test::flex_vector_one<int>{}, 350, [&](const auto& vec) {
+            test::vector_one<int>{}, 350, [&](const auto& vec) {
                 auto id1          = immer_archive::rbts::node_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
-                {
-                    // Loads correctly
-                    auto loader        = example_loader{fix_leaf_nodes(ar)};
-                    const auto loaded1 = loader.load_flex_vector(id1);
-                    REQUIRE(loaded1 == vec);
-                }
+                // Loads correctly
+                auto loader        = make_loader_for(vec, fix_leaf_nodes(ar));
+                const auto loaded1 = loader.load(id1);
+                REQUIRE(loaded1 == vec);
             });
     }
 }
@@ -746,14 +746,10 @@ TEST_CASE("A loop with 2 nodes")
                 }
             }
         ],
-        "vectors": [],
-        "flex_vectors": [
+        "vectors": [
             {
-                "key": 0,
-                "value": {
-                    "root": 0,
-                    "tail": 1
-                }
+                "root": 0,
+                "tail": 1
             }
         ]
     }
@@ -892,12 +888,8 @@ TEST_CASE("Test modifying vector nodes")
     };
     data["value0"]["vectors"] = {
         {
-            {"key", 0},
-            {"value",
-             {
-                 {"root", 0},
-                 {"tail", 1},
-             }},
+            {"root", 0},
+            {"tail", 1},
         },
     };
     data["value0"]["flex_vectors"] = json_t::array();
@@ -916,14 +908,14 @@ TEST_CASE("Test modifying vector nodes")
 
     SECTION("Invalid root id")
     {
-        data["value0"]["vectors"][0]["value"]["root"] = 1;
+        data["value0"]["vectors"][0]["root"] = 1;
         REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
                           immer_archive::invalid_node_id);
     }
 
     SECTION("Invalid tail id")
     {
-        data["value0"]["vectors"][0]["value"]["tail"] = 999;
+        data["value0"]["vectors"][0]["tail"] = 999;
         REQUIRE_THROWS_AS(load_vec(data.dump(), 0),
                           immer_archive::invalid_node_id);
     }
@@ -1048,17 +1040,12 @@ TEST_CASE("Test modifying flex vector nodes")
             },
         },
     };
-    data["value0"]["flex_vectors"] = {
+    data["value0"]["vectors"] = {
         {
-            {"key", 0},
-            {"value",
-             {
-                 {"root", 0},
-                 {"tail", 1},
-             }},
+            {"root", 0},
+            {"tail", 1},
         },
     };
-    data["value0"]["vectors"] = json_t::array();
 
     SECTION("Loads correctly")
     {
@@ -1073,8 +1060,6 @@ TEST_CASE("Test modifying flex vector nodes")
     }
     SECTION("Non-relaxed vector can not have relaxed nodes")
     {
-        data["value0"]["vectors"]      = data["value0"]["flex_vectors"];
-        data["value0"]["flex_vectors"] = json_t::array();
         REQUIRE_THROWS_AS(
             load_vec(data.dump(), 0),
             immer_archive::rbts::relaxed_node_not_allowed_exception);
@@ -1247,16 +1232,12 @@ TEST_CASE("Test more inner nodes")
            {"relaxed", false}}}},
         {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", false}}}},
     };
-    data["value0"]["vectors"]      = {{
-        {"key", 0},
+    data["value0"]["vectors"] = {
         {
-            "value",
-            {
-                {"root", 0},
-                {"tail", 1},
-            },
+            {"root", 0},
+            {"tail", 1},
         },
-    }};
+    };
     data["value0"]["flex_vectors"] = json_t::array();
 
     SECTION("Loads correctly")
@@ -1335,8 +1316,6 @@ TEST_CASE("Test more inner nodes")
     }
     SECTION("Flex vector loads as well")
     {
-        data["value0"]["flex_vectors"] = data["value0"]["vectors"];
-        data["value0"]["vectors"]      = json_t::array();
         REQUIRE(load_flex_vec(data.dump(), 0) == gen(example_vector{}, 67));
 
         auto& inners = data["value0"]["inners"];
@@ -1413,17 +1392,12 @@ TEST_CASE("Exception while loading children")
             },
         },
     };
-    data["value0"]["flex_vectors"] = {
+    data["value0"]["vectors"] = {
         {
-            {"key", 0},
-            {"value",
-             {
-                 {"root", 0},
-                 {"tail", 1},
-             }},
+            {"root", 0},
+            {"tail", 1},
         },
     };
-    data["value0"]["vectors"] = json_t::array();
 
     auto& children = data["value0"]["inners"][0]["value"]["children"];
     REQUIRE(children == json_t::array({2, 3, 4, 5, 2, 3, 4}));
@@ -1443,9 +1417,12 @@ TEST_CASE("Test flex vector with a weird shape relaxed")
         {{"key", 0}, {"value", {{"children", {35}}, {"relaxed", true}}}},
         {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", true}}}},
     };
-    data["value0"]["flex_vectors"] = {
-        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}}}}};
-    data["value0"]["vectors"] = json_t::array();
+    data["value0"]["vectors"] = {
+        {
+            {"root", 0},
+            {"tail", 1},
+        },
+    };
 
     const auto loaded = load_flex_vec(data.dump(), 0);
     // {
@@ -1478,9 +1455,9 @@ TEST_CASE("Test flex vector with a weird shape strict", "[.broken]")
         {{"key", 0}, {"value", {{"children", {35}}, {"relaxed", false}}}},
         {{"key", 35}, {"value", {{"children", {36}}, {"relaxed", false}}}},
     };
-    data["value0"]["flex_vectors"] = {
-        {{"key", 0}, {"value", {{"root", 0}, {"tail", 1}}}}};
-    data["value0"]["vectors"] = json_t::array();
+    data["value0"]["vectors"] = {
+        {{"root", 0}, {"tail", 1}},
+    };
 
     const auto loaded = load_flex_vec(data.dump(), 0);
     // {
@@ -1500,4 +1477,68 @@ TEST_CASE("Test flex vector with a weird shape strict", "[.broken]")
     }
 
     REQUIRE(loaded == expected);
+}
+
+TEST_CASE("Flex vector converted from strict")
+{
+    /**
+     * 1. Save a normal vector
+     * 2. Convert into flex and save again. This is no-op and the ID is the same
+     * as before.
+     * 3. Consequently, you can load any normal vector as a flex-vector
+     */
+    const auto small_vec      = gen(test::vector_one<int>{}, 67);
+    const auto small_flex_vec = test::flex_vector_one<int>{small_vec};
+
+    auto ar           = immer_archive::rbts::make_save_archive_for(small_vec);
+    auto small_vec_id = immer_archive::rbts::node_id{};
+    auto small_flex_vec_id = immer_archive::rbts::node_id{};
+
+    SECTION("First save strict")
+    {
+        std::tie(ar, small_vec_id)      = save_to_archive(small_vec, ar);
+        std::tie(ar, small_flex_vec_id) = save_to_archive(small_flex_vec, ar);
+    }
+    SECTION("First save flex")
+    {
+        std::tie(ar, small_flex_vec_id) = save_to_archive(small_flex_vec, ar);
+        std::tie(ar, small_vec_id)      = save_to_archive(small_vec, ar);
+    }
+
+    // The id is the same
+    REQUIRE(small_flex_vec_id == small_vec_id);
+
+    // Can be loaded either way, as flex or normal
+    {
+        auto loader_flex = make_loader_for(small_flex_vec, fix_leaf_nodes(ar));
+        REQUIRE(small_flex_vec == loader_flex.load(small_flex_vec_id));
+    }
+    {
+        auto loader = make_loader_for(small_vec, fix_leaf_nodes(ar));
+        REQUIRE(small_vec == loader.load(small_vec_id));
+    }
+}
+
+TEST_CASE("Can't load saved flex vector with relaxed nodes as strict")
+{
+    const auto small_vec = gen(test::flex_vector_one<int>{}, 67);
+    const auto vec       = small_vec + small_vec;
+    auto ar              = immer_archive::rbts::make_save_archive_for(vec);
+    auto vec_id          = immer_archive::rbts::node_id{};
+
+    std::tie(ar, vec_id) = save_to_archive(vec, ar);
+    SECTION("Flex loads well")
+    {
+        auto loader_flex =
+            make_loader_for(test::flex_vector_one<int>{}, fix_leaf_nodes(ar));
+        REQUIRE(vec == loader_flex.load(vec_id));
+    }
+    SECTION("Strict can't load")
+    {
+        auto loader =
+            make_loader_for(test::vector_one<int>{}, fix_leaf_nodes(ar));
+        REQUIRE_THROWS_AS(
+            loader.load(vec_id),
+            immer_archive::rbts::relaxed_node_not_allowed_exception);
+    }
 }

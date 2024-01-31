@@ -1,20 +1,10 @@
 {
-   empty_map
+   empty_make_inner_n
    Memcheck:Leak
    match-leak-kinds: possible
    ...
    fun:make_inner_n
    fun:empty
-   fun:map
-}
-{
-   empty_set
-   Memcheck:Leak
-   match-leak-kinds: possible
-   ...
-   fun:make_inner_n
-   fun:empty
-   fun:set
 }
 {
    empty_vector_tail
@@ -35,15 +25,6 @@
    fun:empty_root
    ...
    fun:vector
-}
-{
-   empty_table
-   Memcheck:Leak
-   match-leak-kinds: possible
-   ...
-   fun:make_inner_n
-   fun:empty
-   fun:table
 }
 {
    empty_tail_from_initializer_list
