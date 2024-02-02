@@ -40,7 +40,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
 
     const auto check_save_and_load = [&](const auto& vec) {
         auto ar        = immer_archive::rbts::make_save_archive_for(vec);
-        auto vector_id = immer_archive::rbts::node_id{};
+        auto vector_id = immer_archive::container_id{};
         std::tie(ar, vector_id) = immer_archive::rbts::save_to_archive(vec, ar);
 
         auto loader =

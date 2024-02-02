@@ -78,13 +78,13 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
         }
         case op_check: {
             const auto bitset = std::bitset<var_count>(read<size_t>(in));
-            auto ids          = std::vector<
-                std::pair<std::size_t, immer_archive::champ::node_id>>{};
+            auto ids =
+                std::vector<std::pair<std::size_t, immer_archive::node_id>>{};
             auto archive =
                 immer_archive::champ::container_archive_save<set_t>{};
             for (auto index = std::size_t{}; index < var_count; ++index) {
                 if (bitset[index]) {
-                    auto set_id = immer_archive::champ::node_id{};
+                    auto set_id = immer_archive::node_id{};
                     std::tie(archive, set_id) =
                         immer_archive::champ::save_to_archive(vars[index],
                                                               archive);

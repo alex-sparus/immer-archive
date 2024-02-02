@@ -7,7 +7,7 @@
 #include <immer-archive/champ/traits.hpp>
 #include <immer-archive/json/archivable.hpp>
 #include <immer-archive/json/json_with_archive.hpp>
-#include <immer-archive/rbts/vector.hpp>
+#include <immer-archive/rbts/traits.hpp>
 
 // to save std::pair
 #include <cereal/types/utility.hpp>

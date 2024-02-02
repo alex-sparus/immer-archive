@@ -96,13 +96,13 @@ public:
     {
     }
 
-    immer::vector<T, MemoryPolicy, B, BL> load_vector(node_id id)
+    immer::vector<T, MemoryPolicy, B, BL> load_vector(container_id id)
     {
-        if (id >= ar_.vectors.size()) {
+        if (id.value >= ar_.vectors.size()) {
             throw invalid_container_id{id};
         }
 
-        const auto& info = ar_.vectors[id];
+        const auto& info = ar_.vectors[id.value];
 
         const auto relaxed_allowed = false;
         auto root                  = load_inner(info.root, {}, relaxed_allowed);
@@ -122,13 +122,13 @@ public:
         return impl;
     }
 
-    immer::flex_vector<T, MemoryPolicy, B, BL> load_flex_vector(node_id id)
+    immer::flex_vector<T, MemoryPolicy, B, BL> load_flex_vector(container_id id)
     {
-        if (id >= ar_.vectors.size()) {
+        if (id.value >= ar_.vectors.size()) {
             throw invalid_container_id{id};
         }
 
-        const auto& info = ar_.vectors[id];
+        const auto& info = ar_.vectors[id.value];
 
         const auto relaxed_allowed = true;
         auto root                  = load_inner(info.root, {}, relaxed_allowed);
@@ -482,7 +482,7 @@ public:
     {
     }
 
-    auto load(node_id id) { return loader.load_vector(id); }
+    auto load(container_id id) { return loader.load_vector(id); }
 
 private:
     loader<T, MemoryPolicy, B, BL> loader;
@@ -511,7 +511,7 @@ public:
     {
     }
 
-    auto load(node_id id) { return loader.load_flex_vector(id); }
+    auto load(container_id id) { return loader.load_flex_vector(id); }
 
 private:
     loader<T, MemoryPolicy, B, BL> loader;

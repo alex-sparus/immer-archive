@@ -76,11 +76,11 @@ public:
             return *p;
         }
 
-        if (id >= archive_.size()) {
+        if (id.value >= archive_.size()) {
             throw invalid_node_id{id};
         }
 
-        const auto& node_info = archive_[id];
+        const auto& node_info = archive_[id.value];
 
         const auto n = node_info.values.data.size();
         auto node    = node_ptr{node_t::make_collision_n(n),
@@ -100,11 +100,11 @@ public:
             return *p;
         }
 
-        if (id >= archive_.size()) {
+        if (id.value >= archive_.size()) {
             throw invalid_node_id{id};
         }
 
-        const auto& node_info = archive_[id];
+        const auto& node_info = archive_[id.value];
 
         const auto children_count = node_info.children.size();
         const auto values_count   = node_info.values.data.size();
@@ -185,11 +185,11 @@ public:
 
     std::pair<node_ptr, values_t> load_some_node(node_id id)
     {
-        if (id >= archive_.size()) {
+        if (id.value >= archive_.size()) {
             throw invalid_node_id{id};
         }
 
-        if (archive_[id].collisions) {
+        if (archive_[id.value].collisions) {
             return load_collision(id);
         } else {
             return load_inner(id);

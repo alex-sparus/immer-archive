@@ -69,8 +69,8 @@ public:
 
     Container load(node_id root_id)
     {
-        if (root_id >= archive_.nodes.size()) {
-            throw invalid_container_id{root_id};
+        if (root_id.value >= archive_.nodes.size()) {
+            throw invalid_node_id{root_id};
         }
 
         auto [root, values]    = nodes_.load_inner(root_id);

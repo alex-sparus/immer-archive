@@ -53,7 +53,7 @@ auto save_minimal(
     auto [archive, id] =
         save_to_archive(value.container, std::move(save_archive));
     save_archive = std::move(archive);
-    return id;
+    return id.value;
 }
 
 // This function must exist because cereal does some checks and it's not
@@ -62,22 +62,28 @@ template <class Storage, class Names, class Container>
 auto save_minimal(
     const json_immer_output_archive<detail::archives_load<Storage, Names>>& ar,
     const archivable<Container>& value) ->
-    typename container_traits<Container>::container_id
+    typename container_traits<Container>::container_id::rep_t
 {
     throw std::logic_error{"Should never be called"};
 }
 
 template <class ImmerArchives, class Container>
-void load_minimal(const json_immer_input_archive<ImmerArchives>& ar,
-                  archivable<Container>& value,
-                  const typename container_traits<Container>::container_id& id)
+void load_minimal(
+    const json_immer_input_archive<ImmerArchives>& ar,
+    archivable<Container>& value,
+    const typename container_traits<Container>::container_id::rep_t& id)
 {
     auto& loader = const_cast<json_immer_input_archive<ImmerArchives>&>(ar)
                        .get_input_archives()
                        .template get_loader<Container>();
 
+    // Have to be specific because for vectors container_id is different from
+    // node_id, but for hash-based containers, a container is identified just by
+    // its root node.
+    using container_id_ = typename container_traits<Container>::container_id;
+
     try {
-        value.container = loader.load(id);
+        value.container = loader.load(container_id_{id});
     } catch (const archive_exception& ex) {
         throw ::cereal::Exception{
             fmt::format("Failed to load a container ID {} from the archive: {}",
@@ -90,15 +96,16 @@ void load_minimal(const json_immer_input_archive<ImmerArchives>& ar,
 // possible to have only load_minimal for a type without having save_minimal.
 template <class Archive, class Container>
 auto save_minimal(const Archive& ar, const archivable<Container>& value) ->
-    typename container_traits<Container>::container_id
+    typename container_traits<Container>::container_id::rep_t
 {
     throw std::logic_error{"Should never be called"};
 }
 
 template <class Archive, class Container>
-void load_minimal(const Archive& ar,
-                  archivable<Container>& value,
-                  const typename container_traits<Container>::container_id& id)
+void load_minimal(
+    const Archive& ar,
+    archivable<Container>& value,
+    const typename container_traits<Container>::container_id::rep_t& id)
 {
     // This one is actually called while loading with not-yet-fully-loaded
     // archive.

@@ -15,8 +15,6 @@
 namespace immer_archive {
 namespace champ {
 
-using node_id = std::uint64_t;
-
 template <class T, immer::detail::hamts::bits_t B>
 struct inner_node_save
 {
@@ -98,7 +96,7 @@ std::pair<nodes_save<T, B>, node_id> get_node_id(
         return {std::move(ar), id};
     }
 
-    const auto id     = ar.node_ptr_to_id.size();
+    const auto id     = node_id{ar.node_ptr_to_id.size()};
     ar.node_ptr_to_id = std::move(ar.node_ptr_to_id).set(ptr_void, id);
     return {std::move(ar), id};
 }
@@ -114,7 +112,7 @@ linearize_map(const immer::map<node_id, inner_node_save<T, B>>& inners)
 {
     auto result = immer::vector<InnerNodeType<T, B>>{};
     for (auto index = std::size_t{}; index < inners.size(); ++index) {
-        auto* p = inners.find(index);
+        auto* p = inners.find(node_id{index});
         assert(p);
         const auto& inner = *p;
         result            = std::move(result).push_back(InnerNodeType<T, B>{

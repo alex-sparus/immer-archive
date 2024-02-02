@@ -1,5 +1,7 @@
 #pragma once
 
+#include <immer-archive/common/archive.hpp>
+
 #include <stdexcept>
 
 #include <fmt/format.h>
@@ -15,9 +17,8 @@ public:
 class archive_has_cycles : public archive_exception
 {
 public:
-    explicit archive_has_cycles(std::uint64_t node_id)
-        : archive_exception{
-              fmt::format("Cycle detected with node ID {}", node_id)}
+    explicit archive_has_cycles(node_id id)
+        : archive_exception{fmt::format("Cycle detected with node ID {}", id)}
     {
     }
 };
@@ -25,8 +26,8 @@ public:
 class invalid_node_id : public archive_exception
 {
 public:
-    explicit invalid_node_id(std::uint64_t node_id)
-        : archive_exception{fmt::format("Node ID {} is not found", node_id)}
+    explicit invalid_node_id(node_id id)
+        : archive_exception{fmt::format("Node ID {} is not found", id)}
     {
     }
 };
@@ -34,9 +35,8 @@ public:
 class invalid_container_id : public archive_exception
 {
 public:
-    explicit invalid_container_id(std::uint64_t container_id)
-        : archive_exception{
-              fmt::format("Container ID {} is not found", container_id)}
+    explicit invalid_container_id(container_id id)
+        : archive_exception{fmt::format("Container ID {} is not found", id)}
     {
     }
 };
@@ -44,9 +44,9 @@ public:
 class invalid_children_count : public archive_exception
 {
 public:
-    explicit invalid_children_count(std::uint64_t node_id)
+    explicit invalid_children_count(node_id id)
         : archive_exception{
-              fmt::format("Node ID {} has more children than allowed", node_id)}
+              fmt::format("Node ID {} has more children than allowed", id)}
     {
     }
 };

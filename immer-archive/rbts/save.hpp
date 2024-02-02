@@ -22,7 +22,7 @@ get_node_id(archive_save<T, MemoryPolicy, B, BL> ar,
         return {std::move(ar), id};
     }
 
-    const auto id     = ar.node_ptr_to_id.size();
+    const auto id     = node_id{ar.node_ptr_to_id.size()};
     ar.node_ptr_to_id = std::move(ar.node_ptr_to_id).set(ptr_void, id);
     return {std::move(ar), id};
 }
@@ -149,7 +149,7 @@ template <typename T,
           typename MemoryPolicy,
           immer::detail::rbts::bits_t B,
           immer::detail::rbts::bits_t BL>
-std::pair<archive_save<T, MemoryPolicy, B, BL>, node_id>
+std::pair<archive_save<T, MemoryPolicy, B, BL>, container_id>
 save_to_archive(immer::vector<T, MemoryPolicy, B, BL> vec,
                 archive_save<T, MemoryPolicy, B, BL> archive)
 {
@@ -176,7 +176,7 @@ save_to_archive(immer::vector<T, MemoryPolicy, B, BL> vec,
     assert(archive.inners.count(root_id));
     assert(archive.leaves.count(tail_id));
 
-    const auto vector_id = archive.vectors.size();
+    const auto vector_id = container_id{archive.vectors.size()};
 
     archive.rbts_to_id = std::move(archive.rbts_to_id).set(tree_id, vector_id);
     archive.vectors    = std::move(archive.vectors).push_back(tree_id);
@@ -190,7 +190,7 @@ template <typename T,
           typename MemoryPolicy,
           immer::detail::rbts::bits_t B,
           immer::detail::rbts::bits_t BL>
-std::pair<archive_save<T, MemoryPolicy, B, BL>, node_id>
+std::pair<archive_save<T, MemoryPolicy, B, BL>, container_id>
 save_to_archive(immer::flex_vector<T, MemoryPolicy, B, BL> vec,
                 archive_save<T, MemoryPolicy, B, BL> archive)
 {
@@ -217,7 +217,7 @@ save_to_archive(immer::flex_vector<T, MemoryPolicy, B, BL> vec,
     assert(archive.inners.count(root_id));
     assert(archive.leaves.count(tail_id));
 
-    const auto vector_id = archive.vectors.size();
+    const auto vector_id = container_id{archive.vectors.size()};
 
     archive.rbts_to_id = std::move(archive.rbts_to_id).set(tree_id, vector_id);
     archive.vectors    = std::move(archive.vectors).push_back(tree_id);

@@ -1,10 +1,18 @@
 #pragma once
 
+#include <immer-archive/alias.hpp>
+
 #include <immer/array.hpp>
 
 #include <cereal/types/utility.hpp>
 
 namespace immer_archive {
+
+struct node_id_tag;
+using node_id = type_alias<std::size_t, node_id_tag>;
+
+struct container_id_tag;
+using container_id = type_alias<std::size_t, container_id_tag>;
 
 template <class T>
 struct values_save

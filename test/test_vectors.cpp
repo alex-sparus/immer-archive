@@ -22,30 +22,31 @@
 
 namespace {
 
-auto load_vec(const auto& json, auto vec_id)
+using namespace test;
+using immer_archive::container_id;
+using immer_archive::rbts::save_to_archive;
+using json_t   = nlohmann::json;
+namespace hana = boost::hana;
+
+auto load_vec(const auto& json, std::size_t vec_id)
 {
     const auto archive =
         test::from_json<immer_archive::rbts::archive_load<int>>(json);
     auto loader =
         immer_archive::rbts::make_loader_for(test::example_vector{}, archive);
-    return loader.load(vec_id);
+    return loader.load(container_id{vec_id});
 }
 
-auto load_flex_vec(const auto& json, auto vec_id)
+auto load_flex_vec(const auto& json, std::size_t vec_id)
 {
     const auto archive =
         test::from_json<immer_archive::rbts::archive_load<int>>(json);
     auto loader = immer_archive::rbts::make_loader_for(
         test::example_flex_vector{}, archive);
-    return loader.load(vec_id);
+    return loader.load(container_id{vec_id});
 }
 
 } // namespace
-
-using namespace test;
-using immer_archive::rbts::save_to_archive;
-using json_t   = nlohmann::json;
-namespace hana = boost::hana;
 
 TEST_CASE("Save and load multiple times into the same archive")
 {
@@ -61,7 +62,7 @@ TEST_CASE("Save and load multiple times into the same archive")
         const auto vec = test_vectors.back().push_back(++counter);
         test_vectors.push_back(vec);
 
-        auto vector_id          = immer_archive::rbts::node_id{};
+        auto vector_id          = immer_archive::container_id{};
         std::tie(ar, vector_id) = immer_archive::rbts::save_to_archive(vec, ar);
 
         SPDLOG_DEBUG("start test size {}", vec.size());
@@ -96,9 +97,9 @@ TEST_CASE("Save and load vectors with shared nodes")
     // Save them
     const auto save_vectors = [](const auto& vectors)
         -> std::pair<example_archive_save,
-                     std::vector<immer_archive::rbts::node_id>> {
+                     std::vector<immer_archive::container_id>> {
         auto ar  = example_archive_save{};
-        auto ids = std::vector<immer_archive::rbts::node_id>{};
+        auto ids = std::vector<immer_archive::container_id>{};
         for (const auto& v : vectors) {
             auto [ar2, id] = save_to_archive(v, ar);
             ar             = ar2;
@@ -174,8 +175,8 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
     // Save them
     const auto save_vectors = [](example_archive_save ar, const auto& vectors)
         -> std::pair<example_archive_save,
-                     std::vector<immer_archive::rbts::node_id>> {
-        auto ids = std::vector<immer_archive::rbts::node_id>{};
+                     std::vector<immer_archive::container_id>> {
+        auto ids = std::vector<immer_archive::container_id>{};
         for (const auto& v : vectors) {
             auto [ar2, id] = save_to_archive(v, ar);
             ar             = ar2;
@@ -185,12 +186,12 @@ TEST_CASE("Save and load vectors and flex vectors with shared nodes")
         return {std::move(ar), std::move(ids)};
     };
 
-    auto ar                  = example_archive_save{};
-    const auto vectors       = generate_vectors();
-    const auto flex_vectors  = generate_flex_vectors();
-    auto vector_ids          = std::vector<immer_archive::rbts::node_id>{};
-    auto flex_vectors_ids    = std::vector<immer_archive::rbts::node_id>{};
-    std::tie(ar, vector_ids) = save_vectors(ar, vectors);
+    auto ar                        = example_archive_save{};
+    const auto vectors             = generate_vectors();
+    const auto flex_vectors        = generate_flex_vectors();
+    auto vector_ids                = std::vector<immer_archive::container_id>{};
+    auto flex_vectors_ids          = std::vector<immer_archive::container_id>{};
+    std::tie(ar, vector_ids)       = save_vectors(ar, vectors);
     std::tie(ar, flex_vectors_ids) = save_vectors(ar, flex_vectors);
     REQUIRE(!vector_ids.empty());
     REQUIRE(!flex_vectors_ids.empty());
@@ -241,11 +242,11 @@ TEST_CASE("Archive in-place mutated vector")
 {
     auto vec          = example_vector{1, 2, 3};
     auto ar           = example_archive_save{};
-    auto id1          = immer_archive::rbts::node_id{};
+    auto id1          = immer_archive::container_id{};
     std::tie(ar, id1) = save_to_archive(vec, ar);
 
     vec               = std::move(vec).push_back(90);
-    auto id2          = immer_archive::rbts::node_id{};
+    auto id2          = immer_archive::container_id{};
     std::tie(ar, id2) = save_to_archive(vec, ar);
 
     REQUIRE(id1 != id2);
@@ -260,11 +261,11 @@ TEST_CASE("Archive in-place mutated flex_vector")
 {
     auto vec          = example_flex_vector{1, 2, 3};
     auto ar           = example_archive_save{};
-    auto id1          = immer_archive::rbts::node_id{};
+    auto id1          = immer_archive::container_id{};
     std::tie(ar, id1) = save_to_archive(vec, ar);
 
     vec               = std::move(vec).push_back(90);
-    auto id2          = immer_archive::rbts::node_id{};
+    auto id2          = immer_archive::container_id{};
     std::tie(ar, id2) = save_to_archive(vec, ar);
 
     REQUIRE(id1 != id2);
@@ -281,7 +282,7 @@ TEST_CASE("Test nodes reuse")
     const auto big_vec   = small_vec + small_vec;
 
     auto ar           = example_archive_save{};
-    auto id1          = immer_archive::rbts::node_id{};
+    auto id1          = immer_archive::container_id{};
     std::tie(ar, id1) = save_to_archive(big_vec, ar);
 
     {
@@ -310,7 +311,7 @@ TEST_CASE("Test saving and loading vectors of different lengths", "[slow]")
         for_each_generated_length(
             test::vector_one<int>{}, 350, [&](const auto& vec) {
                 auto ar           = example_archive_save{};
-                auto id1          = immer_archive::rbts::node_id{};
+                auto id1          = immer_archive::container_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
@@ -327,7 +328,7 @@ TEST_CASE("Test saving and loading vectors of different lengths", "[slow]")
         auto ar = example_archive_save{};
         for_each_generated_length(
             test::vector_one<int>{}, 350, [&](const auto& vec) {
-                auto id1          = immer_archive::rbts::node_id{};
+                auto id1          = immer_archive::container_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
@@ -359,7 +360,7 @@ TEST_CASE("Test flex vectors memory leak")
         for_each_generated_length_flex(
             test::flex_vector_one<int>{}, max_length, [&](const auto& vec) {
                 auto ar           = example_archive_save{};
-                auto id1          = immer_archive::rbts::node_id{};
+                auto id1          = immer_archive::container_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
@@ -385,12 +386,12 @@ TEST_CASE("Test flex vectors memory leak")
          * inner node.
          */
         auto ar   = example_archive_save{};
-        auto ids  = std::vector<immer_archive::rbts::node_id>{};
+        auto ids  = std::vector<immer_archive::container_id>{};
         auto vecs = std::vector<test::flex_vector_one<int>>{};
 
         for_each_generated_length_flex(
             test::flex_vector_one<int>{}, max_length, [&](const auto& vec) {
-                auto id1          = immer_archive::rbts::node_id{};
+                auto id1          = immer_archive::container_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
                 ids.push_back(id1);
                 vecs.push_back(vec);
@@ -409,7 +410,7 @@ TEST_CASE("Test flex vectors memory leak")
         for_each_generated_length_flex(
             test::flex_vector_one<int>{}, max_length, [&](const auto& vec) {
                 auto ar           = example_archive_save{};
-                auto id1          = immer_archive::rbts::node_id{};
+                auto id1          = immer_archive::container_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
@@ -447,7 +448,7 @@ TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
         for_each_generated_length_flex(
             test::flex_vector_one<int>{}, 350, [&](const auto& vec) {
                 auto ar           = example_archive_save{};
-                auto id1          = immer_archive::rbts::node_id{};
+                auto id1          = immer_archive::container_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 {
@@ -464,7 +465,7 @@ TEST_CASE("Test saving and loading flex vectors of different lengths", "[slow]")
         auto ar = example_archive_save{};
         for_each_generated_length_flex(
             test::vector_one<int>{}, 350, [&](const auto& vec) {
-                auto id1          = immer_archive::rbts::node_id{};
+                auto id1          = immer_archive::container_id{};
                 std::tie(ar, id1) = save_to_archive(vec, ar);
 
                 // Loads correctly
@@ -839,7 +840,7 @@ TEST_CASE("Test vector with very big objects")
 
     auto ar = immer_archive::rbts::make_save_archive_for(
         test::vector_one<big_object>{});
-    auto id1          = immer_archive::rbts::node_id{};
+    auto id1          = immer_archive::container_id{};
     std::tie(ar, id1) = save_to_archive(small_vec, ar);
 
     {
@@ -1427,7 +1428,7 @@ TEST_CASE("Test flex vector with a weird shape relaxed")
     const auto loaded = load_flex_vec(data.dump(), 0);
     // {
     //     auto ar        = immer_archive::rbts::make_save_archive_for(loaded);
-    //     auto vector_id = immer_archive::rbts::node_id{};
+    //     auto vector_id = immer_archive::node_id{};
     //     std::tie(ar, vector_id) =
     //         immer_archive::rbts::save_to_archive(loaded, ar);
     //     SPDLOG_INFO("{}", test::to_json(ar));
@@ -1462,7 +1463,7 @@ TEST_CASE("Test flex vector with a weird shape strict", "[.broken]")
     const auto loaded = load_flex_vec(data.dump(), 0);
     // {
     //     auto ar        = immer_archive::rbts::make_save_archive_for(loaded);
-    //     auto vector_id = immer_archive::rbts::node_id{};
+    //     auto vector_id = immer_archive::node_id{};
     //     std::tie(ar, vector_id) =
     //         immer_archive::rbts::save_to_archive(loaded, ar);
     //     SPDLOG_INFO("{}", test::to_json(ar));
@@ -1491,8 +1492,8 @@ TEST_CASE("Flex vector converted from strict")
     const auto small_flex_vec = test::flex_vector_one<int>{small_vec};
 
     auto ar           = immer_archive::rbts::make_save_archive_for(small_vec);
-    auto small_vec_id = immer_archive::rbts::node_id{};
-    auto small_flex_vec_id = immer_archive::rbts::node_id{};
+    auto small_vec_id = immer_archive::container_id{};
+    auto small_flex_vec_id = immer_archive::container_id{};
 
     SECTION("First save strict")
     {
@@ -1524,7 +1525,7 @@ TEST_CASE("Can't load saved flex vector with relaxed nodes as strict")
     const auto small_vec = gen(test::flex_vector_one<int>{}, 67);
     const auto vec       = small_vec + small_vec;
     auto ar              = immer_archive::rbts::make_save_archive_for(vec);
-    auto vec_id          = immer_archive::rbts::node_id{};
+    auto vec_id          = immer_archive::container_id{};
 
     std::tie(ar, vec_id) = save_to_archive(vec, ar);
     SECTION("Flex loads well")

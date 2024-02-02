@@ -15,7 +15,7 @@ struct container_traits<immer::vector<T, MemoryPolicy, B, BL>>
     using save_archive_t = rbts::archive_save<T, MemoryPolicy, B, BL>;
     using load_archive_t = rbts::archive_load<T>;
     using loader_t       = rbts::vector_loader<T, MemoryPolicy, B, BL>;
-    using container_id   = rbts::node_id;
+    using container_id   = immer_archive::container_id;
 };
 
 template <typename T,
@@ -27,7 +27,7 @@ struct container_traits<immer::flex_vector<T, MemoryPolicy, B, BL>>
     using save_archive_t = rbts::archive_save<T, MemoryPolicy, B, BL>;
     using load_archive_t = rbts::archive_load<T>;
     using loader_t       = rbts::flex_vector_loader<T, MemoryPolicy, B, BL>;
-    using container_id   = rbts::node_id;
+    using container_id   = immer_archive::container_id;
 };
 
 } // namespace immer_archive

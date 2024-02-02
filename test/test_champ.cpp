@@ -9,6 +9,7 @@
 
 using namespace test;
 using json_t = nlohmann::json;
+using immer_archive::node_id;
 
 namespace {
 
@@ -149,7 +150,7 @@ TEST_CASE("Test archive conversion, no json")
     const auto set        = gen_set(Container{}, 200);
     const auto set2       = gen_set(set, 300);
     auto [ar, set_id]     = immer_archive::champ::save_to_archive(set, {});
-    auto set2_id          = immer_archive::champ::node_id{};
+    auto set2_id          = immer_archive::node_id{};
     std::tie(ar, set2_id) = immer_archive::champ::save_to_archive(set2, ar);
 
     auto loader = immer_archive::champ::container_loader{to_load_archive(ar)};
@@ -181,7 +182,7 @@ TEST_CASE("Test save mutated set")
     auto [ar, set_id] = immer_archive::champ::save_to_archive(set, {});
 
     set                   = std::move(set).insert("435");
-    auto set_id2          = immer_archive::champ::node_id{};
+    auto set_id2          = immer_archive::node_id{};
     std::tie(ar, set_id2) = immer_archive::champ::save_to_archive(set, ar);
 
     REQUIRE(set_id != set_id2);
@@ -235,7 +236,7 @@ TEST_CASE("Test map archive conversion, no json")
     const auto map        = gen_map(Container{}, 200);
     const auto map2       = gen_map(map, 300);
     auto [ar, map_id]     = immer_archive::champ::save_to_archive(map, {});
-    auto map2_id          = immer_archive::champ::node_id{};
+    auto map2_id          = immer_archive::node_id{};
     std::tie(ar, map2_id) = immer_archive::champ::save_to_archive(map2, ar);
 
     auto loader = immer_archive::champ::container_loader{to_load_archive(ar)};
@@ -267,7 +268,7 @@ TEST_CASE("Test save mutated map")
     auto [ar, map_id] = immer_archive::champ::save_to_archive(map, {});
 
     map                   = std::move(map).set(999, "435");
-    auto map_id2          = immer_archive::champ::node_id{};
+    auto map_id2          = immer_archive::node_id{};
     std::tie(ar, map_id2) = immer_archive::champ::save_to_archive(map, ar);
 
     REQUIRE(map_id != map_id2);
@@ -282,7 +283,7 @@ void test_table_types(Verify&& verify)
 
     auto [ar, t1_id] = immer_archive::champ::save_to_archive(t1, {});
 
-    auto t2_id          = immer_archive::champ::node_id{};
+    auto t2_id          = immer_archive::node_id{};
     std::tie(ar, t2_id) = immer_archive::champ::save_to_archive(t2, ar);
 
     const auto ar_str = to_json(ar);
@@ -345,7 +346,7 @@ TEST_CASE("Test saving a table, no json")
 
     auto [ar, t1_id] = immer_archive::champ::save_to_archive(t1, {});
 
-    auto t2_id          = immer_archive::champ::node_id{};
+    auto t2_id          = immer_archive::node_id{};
     std::tie(ar, t2_id) = immer_archive::champ::save_to_archive(t2, ar);
 
     const auto ar_str = to_json(ar);
@@ -377,7 +378,7 @@ TEST_CASE("Test modifying set nodes")
     const auto expected_set2 = expected_set.insert("thirty");
 
     auto [ar, set_id] = immer_archive::champ::save_to_archive(expected_set, {});
-    auto set2_id      = immer_archive::champ::node_id{};
+    auto set2_id      = immer_archive::node_id{};
     std::tie(ar, set2_id) =
         immer_archive::champ::save_to_archive(expected_set2, std::move(ar));
     const auto ar_str        = to_json(ar);
@@ -575,7 +576,8 @@ TEST_CASE("Test modifying set nodes")
             from_json<immer_archive::champ::container_archive_load<Container>>(
                 data.dump());
         auto loader = immer_archive::champ::container_loader{loaded_archive};
-        REQUIRE(loader.load(0).identity() == loader.load(0).identity());
+        REQUIRE(loader.load(node_id{0}).identity() ==
+                loader.load(node_id{0}).identity());
     }
 }
 
@@ -587,7 +589,7 @@ TEST_CASE("Test modifying nodes with collisions")
     const auto expected_set2 = expected_set.insert("thirty");
 
     auto [ar, set_id] = immer_archive::champ::save_to_archive(expected_set, {});
-    auto set2_id      = immer_archive::champ::node_id{};
+    auto set2_id      = immer_archive::node_id{};
     std::tie(ar, set2_id) =
         immer_archive::champ::save_to_archive(expected_set2, std::move(ar));
     const auto ar_str        = to_json(ar);

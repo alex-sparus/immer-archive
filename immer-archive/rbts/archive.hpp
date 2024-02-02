@@ -1,5 +1,6 @@
 #pragma once
 
+#include <immer-archive/alias.hpp>
 #include <immer-archive/cereal/immer_map.hpp>
 #include <immer-archive/cereal/immer_vector.hpp>
 #include <immer-archive/common/archive.hpp>
@@ -12,9 +13,6 @@
 #include <cereal/cereal.hpp>
 
 namespace immer_archive::rbts {
-
-using node_id = std::uint64_t;
-static_assert(sizeof(void*) == sizeof(node_id));
 
 struct inner_node
 {
@@ -64,7 +62,7 @@ struct archive_save
     immer::map<node_id, inner_node> inners;
     immer::vector<rbts_info> vectors;
 
-    immer::map<rbts_info, node_id> rbts_to_id;
+    immer::map<rbts_info, container_id> rbts_to_id;
     immer::map<const void*, node_id> node_ptr_to_id;
 
     // Saving the archived vectors, so that no mutations are allowed to happen.
@@ -153,8 +151,10 @@ struct hash<immer_archive::rbts::rbts_info>
         };
 
         auto seed = std::size_t{};
-        boost_combine(seed, hash<immer_archive::rbts::node_id>{}(x.root));
-        boost_combine(seed, hash<immer_archive::rbts::node_id>{}(x.tail));
+        boost_combine(seed,
+                      hash<immer_archive::node_id::rep_t>{}(x.root.value));
+        boost_combine(seed,
+                      hash<immer_archive::node_id::rep_t>{}(x.tail.value));
         return seed;
     }
 };

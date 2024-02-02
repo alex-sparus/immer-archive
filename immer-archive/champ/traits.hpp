@@ -14,7 +14,7 @@ struct champ_traits
     using load_archive_t =
         immer_archive::champ::container_archive_load<Container>;
     using loader_t     = immer_archive::champ::container_loader<Container>;
-    using container_id = immer_archive::champ::node_id;
+    using container_id = immer_archive::node_id;
 };
 
 template <typename K,
